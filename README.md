@@ -50,26 +50,31 @@ bpe-vitaldb/
 │   ├── download-vitaldb.bat        # run scripts/download-vitaldb.py
 │   ├── vitaldb-browser.bat         # run scripts/vitaldb-browser.py
 │   ├── construct-dataset.bat       # run scripts/construct-dataset.py
-│   └── dataset-browser.bat         # run scripts/dataset-browser.py
+│   ├── dataset-browser.bat         # run scripts/dataset-browser.py
+│   ├── share-data.bat              # run scripts/share-data.py (HTTP server)
+│   ├── download-shared-data.bat    # download data/ from a remote share-data host
+│   └── train-model.bat             # run scripts/train.py
 ├── scripts/
 │   ├── download-vitaldb.py         # parallel .vital file downloader
 │   ├── vitaldb-browser.py          # GUI waveform browser (tkinter + matplotlib)
 │   ├── construct-dataset.py        # build train/val/test NPZ datasets
-│   └── dataset-browser.py          # GUI dataset segment browser
+│   ├── dataset-browser.py          # GUI dataset segment browser
+│   ├── share-data.py               # multi-threaded HTTP file server
+│   └── train.py                    # model training pipeline
 ├── data/
 │   ├── vitaldb/                    # downloaded .vital files (git-ignored)
-│   └── dataset/                    # NPZ segment files (git-ignored)
-│       ├── train/
-│       ├── val/
-│       └── test/
+│   ├── dataset/                    # NPZ segment files (git-ignored)
+│   │   ├── train/
+│   │   ├── val/
+│   │   └── test/
+│   └── models/                     # training checkpoints & metrics (git-ignored)
 ├── AGENTS.md                       # contribution rules for AI agents
 ├── pyproject.toml                  # uv project configuration
 └── README.md
 ```
 
 > **Planned additions**
-> `scripts/train.py` · `scripts/evaluate.py`
-> `src/model.py` · `src/metrics.py`
+> `scripts/evaluate.py` · `src/metrics.py`
 
 ## Getting Started
 
@@ -183,6 +188,103 @@ The browser shows a **unified single window**:
 # if the dataset was built with a non-default sample rate:
 bin\dataset-browser.bat --target-hz 250
 ```
+
+### 6. Share data between machines
+
+`share-data` serves the entire `data/` folder over HTTP so that another
+machine on the same network can pull it down without needing SSH, cloud
+storage, or physical drives.
+
+**On the machine that has the data (server):**
+
+```bash
+bin\share-data.bat          # Windows — listens on port 8888
+bin/share-data              # Linux / macOS
+# optional: specify a different port
+bin\share-data.bat 9000
+bin/share-data 9000
+```
+
+The LAN address is printed on startup, e.g. `http://192.168.1.10:8888/`.
+
+| Option      | Default     | Description                |
+| ----------- | ----------- | -------------------------- |
+| `--port`    | `8888`      | TCP port to listen on      |
+| `--bind`    | `0.0.0.0`   | Bind address               |
+| `--data-dir`| `data`      | Directory to serve         |
+
+**On the machine that needs the data (client):**
+
+```bash
+bin\download-shared-data.bat 192.168.1.10          # Windows
+bin/download-shared-data     192.168.1.10          # Linux / macOS
+# with a non-default port:
+bin\download-shared-data.bat 192.168.1.10 9000
+```
+
+Files are written to `data/` in the project root, mirroring the remote
+directory tree.  Re-running the command resumes an interrupted transfer;
+already-complete files are skipped automatically.
+
+> **Windows prerequisite:** `wget.exe` must be on `PATH`.  
+> Install with `winget install GnuWin32.Wget` or download from
+> [eternallybored.org/misc/wget](https://eternallybored.org/misc/wget/).
+
+### 7. Train a model
+
+Run the training pipeline against the NPZ dataset built in step 4:
+
+```bash
+bin\train-model.bat --model resnet1d              # Windows
+bin/train-model     --model resnet1d              # Linux / macOS
+```
+
+Available model architectures:
+
+| Model name             | Description                                      |
+| ---------------------- | ------------------------------------------------ |
+| `resnet1d`             | 1D ResNet — lightweight, fast baseline           |
+| `st_resnet`            | Spectro-Temporal ResNet (PPG + VPG + APG branches) |
+| `minception`           | Multi-scale Inception 1D CNN                     |
+| `xresnet1d`            | Deep XResNet-101-style 1D CNN                    |
+
+Common usage examples:
+
+```bash
+# default hyperparameters
+bin\train-model.bat --model resnet1d
+
+# longer run with larger batches
+bin\train-model.bat --model st_resnet --epochs 150 --batch-size 512
+
+# custom learning rate and early-stopping patience
+bin\train-model.bat --model minception --lr 5e-4 --patience 20
+
+# resume from a previous checkpoint
+bin\train-model.bat --model resnet1d --resume data\models\resnet1d\<run-id>\last.pt
+```
+
+Checkpoints and a metrics CSV are saved under
+`data/models/<model>/<run-id>/`.
+
+| Option           | Default          | Description                              |
+| ---------------- | ---------------- | ---------------------------------------- |
+| `--model`        | *(required)*     | Model name from the registry             |
+| `--dataset-dir`  | `data/dataset`   | Root dataset directory                   |
+| `--output-dir`   | `data/models`    | Root directory for saved runs            |
+| `--epochs`       | `100`            | Maximum training epochs                  |
+| `--batch-size`   | `256`            | Mini-batch size                          |
+| `--lr`           | `1e-3`           | Initial learning rate                    |
+| `--weight-decay` | `1e-4`           | AdamW weight decay                       |
+| `--patience`     | `15`             | Early-stopping patience (val loss)       |
+| `--seed`         | `42`             | Random seed                              |
+| `--device`       | `auto`           | `auto` \| `cpu` \| `cuda` \| `cuda:N`   |
+| `--workers`      | `4`              | DataLoader worker processes              |
+| `--preload`      | off              | Load all segments into RAM before training |
+| `--no-normalize` | off              | Skip per-segment z-score normalization   |
+| `--resume`       | —                | Path to a checkpoint `.pt` to resume from |
+
+Run `bin\train-model.bat --help` for the full option listing.
 
 ## Signals of Interest
 
