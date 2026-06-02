@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Download the entire shared data/ folder from a remote host running
+# bin/share-data.bat (Python http.server).
+#
+# Usage:
+#   bin/download-shared-data <host> [port]
+#
+#   host  IP address or hostname of the Windows machine
+#   port  HTTP port (default: 8000)
+#
+# Example:
+#   bin/download-shared-data 192.168.1.10
+#   bin/download-shared-data 192.168.1.10 9000
+#
+# Files are written to data/ relative to the project root, mirroring
+# the directory tree served by the remote host.
+
+set -euo pipefail
+
+HOST="${1:-}"
+PORT="${2:-8000}"
+
+if [ -z "$HOST" ]; then
+    echo "Usage: $(basename "$0") <host> [port]" >&2
+    exit 1
+fi
+
+SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
+cd "$SCRIPT_DIR/.."
+
+BASE_URL="http://${HOST}:${PORT}/"
+
+echo "Downloading data/ from ${BASE_URL} ..."
+
+wget \
+    --recursive \
+    --no-host-directories \
+    --cut-dirs=0 \
+    --directory-prefix=data \
+    --no-parent \
+    --reject "index.html*" \
+    --progress=dot:mega \
+    "${BASE_URL}"
+
+echo "Done. Files saved to: $(pwd)/data/"
