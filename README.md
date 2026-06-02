@@ -7,11 +7,11 @@ from photoplethysmography (PPG) waveforms, trained on the publicly available
 ## Project Goal
 
 Develop a deep learning model that takes a raw PPG waveform segment as input
-and predicts continuous blood pressure values (SBP / DBP / MBP) as output,
+and predicts continuous blood pressure values (SBP / DBP) as output,
 without requiring invasive arterial-line measurement at inference time.
 
 ```text
-PPG waveform (125 Hz)  ──►  [ Deep Learning Model ]  ──►  SBP / DBP / MBP (mmHg)
+PPG waveform (125 Hz)  ──►  [ Deep Learning Model ]  ──►  SBP / DBP (mmHg)
 ```
 
 ## Dataset — VitalDB
@@ -36,7 +36,7 @@ form the core training dataset for this project.
 
 ```text
 Phase 1  Data acquisition     ✅  download & browse VitalDB .vital files
-Phase 2  Preprocessing            segment, filter, align PPG ↔ ABP signals
+Phase 2  Preprocessing        ✅  segment, filter, align PPG ↔ ABP signals
 Phase 3  Model development        design & train PyTorch architecture
 Phase 4  Evaluation               benchmark against published BPE methods
 Phase 5  Analysis                 clinical validation, error analysis
@@ -46,22 +46,30 @@ Phase 5  Analysis                 clinical validation, error analysis
 
 ```text
 bpe-vitaldb/
-├── bin/                        # Windows launcher scripts
-│   ├── download-vitaldb.bat    # run scripts/download-vitaldb.py
-│   └── vitaldb-browser.bat     # run scripts/vitaldb-browser.py
+├── bin/                            # Launcher scripts (Windows .bat + POSIX sh)
+│   ├── download-vitaldb.bat        # run scripts/download-vitaldb.py
+│   ├── vitaldb-browser.bat         # run scripts/vitaldb-browser.py
+│   ├── construct-dataset.bat       # run scripts/construct-dataset.py
+│   └── dataset-browser.bat         # run scripts/dataset-browser.py
 ├── scripts/
-│   ├── download-vitaldb.py     # parallel .vital file downloader
-│   └── vitaldb-browser.py      # GUI waveform browser (tkinter + matplotlib)
+│   ├── download-vitaldb.py         # parallel .vital file downloader
+│   ├── vitaldb-browser.py          # GUI waveform browser (tkinter + matplotlib)
+│   ├── construct-dataset.py        # build train/val/test NPZ datasets
+│   └── dataset-browser.py          # GUI dataset segment browser
 ├── data/
-│   └── vitaldb/                # downloaded .vital files (git-ignored)
-├── AGENTS.md                   # contribution rules for AI agents
-├── pyproject.toml              # uv project configuration
+│   ├── vitaldb/                    # downloaded .vital files (git-ignored)
+│   └── dataset/                    # NPZ segment files (git-ignored)
+│       ├── train/
+│       ├── val/
+│       └── test/
+├── AGENTS.md                       # contribution rules for AI agents
+├── pyproject.toml                  # uv project configuration
 └── README.md
 ```
 
 > **Planned additions**
-> `scripts/preprocess.py` · `scripts/train.py` · `scripts/evaluate.py`
-> `src/dataset.py` · `src/model.py` · `src/metrics.py`
+> `scripts/train.py` · `scripts/evaluate.py`
+> `src/model.py` · `src/metrics.py`
 
 ## Getting Started
 
@@ -101,7 +109,7 @@ bin\download-vitaldb.bat --filter-tracks
 | `--no-resume`                 | off            | Re-download existing files                      |
 | `--filter-tracks`             | off            | Only PPG + ABP cases (uses deprecated trks API) |
 
-### 3. Browse waveforms
+### 3. Browse raw waveforms
 
 ```bash
 bin\vitaldb-browser.bat
@@ -118,13 +126,71 @@ The browser shows a **unified single window**:
 - **Navigation** — slider, buttons, or keyboard (`←` / `→` 10 s, `Ctrl+←/→` 60 s)
 - **Track Info** button — lists all tracks in the loaded case
 
+### 4. Build the dataset
+
+Segment the downloaded `.vital` files into train / val / test NPZ files:
+
+```bash
+bin\construct-dataset.bat
+```
+
+Each `.vital` case is resampled to 125 Hz, sliced into 8-second windows with
+50 % overlap (4-second stride), and saved as `data/dataset/{split}/{caseid}.npz`.
+Windows that contain NaN values or physiologically implausible BP readings are
+discarded.  Cases are split at the **case level** (not segment level) to prevent
+data leakage.
+
+| Option            | Default          | Description                               |
+| ----------------- | ---------------- | ----------------------------------------- |
+| `--data-dir`      | `data/vitaldb`   | Source directory of `.vital` files        |
+| `--output-dir`    | `data/dataset`   | Root output directory                     |
+| `--split`         | `0.6 0.2 0.2`    | Train / val / test case ratios            |
+| `--target-hz`     | `125`            | Output PPG sample rate (Hz)               |
+| `--segment-sec`   | `8`              | Window duration in seconds                |
+| `--seed`          | `42`             | Random seed for case shuffling            |
+
+Each output `.npz` contains:
+
+```text
+x  float32  (N, segment_samples)   PPG segments
+y  float32  (N, 2)                 [SBP_mean, DBP_mean] in mmHg
+```
+
+### 5. Browse dataset segments
+
+Inspect the preprocessed NPZ segments in a GUI:
+
+```bash
+bin\dataset-browser.bat
+```
+
+The browser shows a **unified single window**:
+
+- **Left panel** — split selector (`Train` / `Val` / `Test`) + sortable case
+  list with case ID, segment count, and file size; metadata loads in the
+  background so the UI is immediately responsive
+- **Right panel** — PPG waveform plot for the selected segment; SBP and DBP
+  values shown both in the top info bar and as annotated boxes on the graph
+- **Navigation** — `◀ Prev` / `Next ▶` buttons, a slider for fast scrubbing,
+  a jump-to-segment entry field, and keyboard shortcuts
+
+| Keyboard     | Action                   |
+| ------------ | ------------------------ |
+| `←` / `→`    | Previous / next segment  |
+| `↑` / `↓`    | Previous / next case     |
+
+```bash
+# if the dataset was built with a non-default sample rate:
+bin\dataset-browser.bat --target-hz 250
+```
+
 ## Signals of Interest
 
 | Signal               | Track                       | Rate   | Role                      |
 | -------------------- | --------------------------- | ------ | ------------------------- |
 | PPG                  | `SNUADC/PLETH`              | 500 Hz | Model **input**           |
 | Arterial BP waveform | `SNUADC/ART`                | 500 Hz | Ground truth (continuous) |
-| SBP / DBP / MBP      | `Solar8000/ART_SBP/DBP/MBP` | ~1 Hz  | Ground truth (numeric)    |
+| SBP / DBP            | `Solar8000/ART_SBP/DBP`     | ~1 Hz  | Ground truth (numeric)    |
 | ECG II               | `SNUADC/ECG_II`             | 500 Hz | Auxiliary / quality check |
 
 ## Environment
