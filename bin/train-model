@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Train a BPE model on the VitalDB NPZ dataset.
+#
+# Usage:
+#   bin/train-model --model <name> [OPTIONS]
+#
+# Model names:
+#   resnet1d            1D ResNet (light, fast baseline)
+#   st_resnet           Spectro-Temporal ResNet  (PPG + VPG + APG branches)
+#   minception          Multi-scale Inception 1D CNN
+#   xresnet1d           Deep XResNet-101-style 1D CNN
+#
+# Examples:
+#   bin/train-model --model resnet1d
+#   bin/train-model --model st_resnet --epochs 150 --batch-size 512
+#   bin/train-model --model minception --lr 5e-4 --patience 20
+#   bin/train-model --model xresnet1d --batch-size 128 --workers 2
+#   bin/train-model --model resnet1d --resume data/models/resnet1d/<run-id>/last.pt
+#
+# All options are forwarded to scripts/train.py.
+# Run "bin/train-model --help" for a full option listing.
+
+cd "$(dirname "$0")/.."
+uv run python scripts/train.py "$@"
