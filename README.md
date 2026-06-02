@@ -1,0 +1,145 @@
+# bpe-vitaldb (Blood Pressure Estimation from PPG using VitalDB)
+
+A PyTorch deep learning project that estimates arterial blood pressure (ABP)
+from photoplethysmography (PPG) waveforms, trained on the publicly available
+[VitalDB](https://vitaldb.net) intraoperative biosignal dataset.
+
+## Project Goal
+
+Develop a deep learning model that takes a raw PPG waveform segment as input
+and predicts continuous blood pressure values (SBP / DBP / MBP) as output,
+without requiring invasive arterial-line measurement at inference time.
+
+```text
+PPG waveform (125 Hz)  ──►  [ Deep Learning Model ]  ──►  SBP / DBP / MBP (mmHg)
+```
+
+## Dataset — VitalDB
+
+[VitalDB](https://vitaldb.net) is the world's largest open intraoperative
+biosignal dataset, built by the VitalLab research group at Seoul National
+University Hospital (Prof. Chul-Woo Jung, Prof. Hyung-Chul Lee et al.).
+
+| Item              | Detail                                                       |
+| ----------------- | ------------------------------------------------------------ |
+| Total cases       | 6,388 surgical patients                                      |
+| Waveform format   | `.vital` (packed binary, all tracks aligned)                 |
+| PPG track         | `SNUADC/PLETH` — 500 Hz                                      |
+| ABP waveform      | `SNUADC/ART` — 500 Hz (invasive radial arterial line)        |
+| Numeric BP        | `Solar8000/ART_SBP`, `ART_DBP`, `ART_MBP` — ~1 Hz            |
+| Clinical metadata | Age, sex, height, weight, operation name, anesthesia type, … |
+
+Cases that contain **both** PPG and invasive ABP waveforms (~3,000 cases)
+form the core training dataset for this project.
+
+## Project Roadmap
+
+```text
+Phase 1  Data acquisition     ✅  download & browse VitalDB .vital files
+Phase 2  Preprocessing            segment, filter, align PPG ↔ ABP signals
+Phase 3  Model development        design & train PyTorch architecture
+Phase 4  Evaluation               benchmark against published BPE methods
+Phase 5  Analysis                 clinical validation, error analysis
+```
+
+## Repository Layout
+
+```text
+bpe-vitaldb/
+├── bin/                        # Windows launcher scripts
+│   ├── download-vitaldb.bat    # run scripts/download-vitaldb.py
+│   └── vitaldb-browser.bat     # run scripts/vitaldb-browser.py
+├── scripts/
+│   ├── download-vitaldb.py     # parallel .vital file downloader
+│   └── vitaldb-browser.py      # GUI waveform browser (tkinter + matplotlib)
+├── data/
+│   └── vitaldb/                # downloaded .vital files (git-ignored)
+├── AGENTS.md                   # contribution rules for AI agents
+├── pyproject.toml              # uv project configuration
+└── README.md
+```
+
+> **Planned additions**
+> `scripts/preprocess.py` · `scripts/train.py` · `scripts/evaluate.py`
+> `src/dataset.py` · `src/model.py` · `src/metrics.py`
+
+## Getting Started
+
+### 1. Install dependencies
+
+```bash
+# requires uv  (https://docs.astral.sh/uv/)
+uv sync
+```
+
+### 2. Download VitalDB data
+
+Download all 6,388 cases (full dataset, ~200 GB):
+
+```bash
+bin\download-vitaldb.bat
+```
+
+Download a small subset for exploration:
+
+```bash
+bin\download-vitaldb.bat --max-cases 50
+```
+
+Only cases that have both PPG and ABP tracks:
+
+```bash
+bin\download-vitaldb.bat --filter-tracks
+```
+
+| Option                        | Default        | Description                                     |
+| ----------------------------- | -------------- | ----------------------------------------------- |
+| `--output-dir`                | `data/vitaldb` | Download destination                            |
+| `--max-cases`                 | all            | Limit number of cases                           |
+| `--start-case` / `--end-case` | 1 / 6388       | Case ID range                                   |
+| `--workers`                   | 4              | Parallel download threads                       |
+| `--no-resume`                 | off            | Re-download existing files                      |
+| `--filter-tracks`             | off            | Only PPG + ABP cases (uses deprecated trks API) |
+
+### 3. Browse waveforms
+
+```bash
+bin\vitaldb-browser.bat
+# or open a specific case directly:
+bin\vitaldb-browser.bat --case 1
+```
+
+The browser shows a **unified single window**:
+
+- **Left panel** — sortable case list; rows highlighted by available signals
+  - Green text → PPG present
+  - Crimson background → invasive ABP present
+- **Right panel** — live waveform canvas (PPG, ABP, ECG II, numeric BP/HR)
+- **Navigation** — slider, buttons, or keyboard (`←` / `→` 10 s, `Ctrl+←/→` 60 s)
+- **Track Info** button — lists all tracks in the loaded case
+
+## Signals of Interest
+
+| Signal               | Track                       | Rate   | Role                      |
+| -------------------- | --------------------------- | ------ | ------------------------- |
+| PPG                  | `SNUADC/PLETH`              | 500 Hz | Model **input**           |
+| Arterial BP waveform | `SNUADC/ART`                | 500 Hz | Ground truth (continuous) |
+| SBP / DBP / MBP      | `Solar8000/ART_SBP/DBP/MBP` | ~1 Hz  | Ground truth (numeric)    |
+| ECG II               | `SNUADC/ECG_II`             | 500 Hz | Auxiliary / quality check |
+
+## Environment
+
+| Tool             | Version                                             |
+| ---------------- | --------------------------------------------------- |
+| Python           | ≥ 3.13                                              |
+| Package manager  | [uv](https://docs.astral.sh/uv/)                    |
+| Key dependencies | `vitaldb`, `torch` (planned), `numpy`, `matplotlib` |
+
+> **Do not use `pip install`.**  
+> All dependency management must go through `uv`. See `AGENTS.md`.
+
+## References
+
+- Kachuee, M. et al. (2017). *Cuffless Blood Pressure Estimation Algorithms for Continuous Health-Care Monitoring.* IEEE TBME.
+- Slapničar, G. et al. (2019). *Blood Pressure Estimation from Photoplethysmogram Using a Spectro-Temporal Deep Neural Network.* Sensors.
+- Lee, H.-C. et al. (2022). *VitalDB, a high-fidelity multi-parameter vital signs database in surgical patients.* Scientific Data.

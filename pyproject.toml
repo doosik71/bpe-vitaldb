@@ -1,7 +1,7 @@
 [project]
 name = "bpe-vitaldb"
 version = "0.1.0"
-description = "Add your description here"
+description = "Blood pressure estimation from PPG using VitalDB and PyTorch"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
