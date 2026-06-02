@@ -283,12 +283,19 @@ bin/train-model     --model resnet1d              # Linux / macOS
 
 Available model architectures:
 
-| Model name             | Description                                      |
-| ---------------------- | ------------------------------------------------ |
-| `resnet1d`             | 1D ResNet — lightweight, fast baseline           |
-| `st_resnet`            | Spectro-Temporal ResNet (PPG + VPG + APG branches) |
-| `minception`           | Multi-scale Inception 1D CNN                     |
-| `xresnet1d`            | Deep XResNet-101-style 1D CNN                    |
+| Model name               | Description                                        | Layers | Params    |
+| ------------------------ | -------------------------------------------------- | -----: | --------: |
+| `resnet1d`               | 1D ResNet — lightweight, fast baseline             |    100 |   2.18 M  |
+| `resnet1d_mini`          | ResNet1D 50 % depth (4 stages × 1 block)           |     60 |  964.4 K  |
+| `resnet1d_tiny`          | ResNet1D 25 % depth (2 stages × 1 block)           |     34 |   60.6 K  |
+| `resnet1d_micro`         | ResNet1D ~10 % depth (1 stage × 1 block)           |     21 |   15.1 K  |
+| `st_resnet`              | Spectro-Temporal ResNet (PPG + VPG + APG branches) |    140 |  478.9 K  |
+| `minception`             | Multi-scale Inception 1D CNN                       |    134 |  440.7 K  |
+| `minception_demographic` | MInception + age / sex / BMI side-channel fusion   |    143 |  454.6 K  |
+| `xresnet1d`              | Deep XResNet-101-style 1D CNN                      |    484 |   9.47 M  |
+
+> Layers = total named modules (forward hooks); Params = trainable parameters.  
+> Input: PPG segment (1, 1000) — 8 s @ 125 Hz. `minception_demographic` additionally takes a demographics tensor (1, 3).
 
 Common usage examples:
 
@@ -309,22 +316,22 @@ bin\train-model.bat --model resnet1d --resume data\models\resnet1d\<run-id>\last
 Checkpoints and a metrics CSV are saved under
 `data/models/<model>/<run-id>/`.
 
-| Option           | Default          | Description                              |
-| ---------------- | ---------------- | ---------------------------------------- |
-| `--model`        | *(required)*     | Model name from the registry             |
-| `--dataset-dir`  | `data/dataset`   | Root dataset directory                   |
-| `--output-dir`   | `data/models`    | Root directory for saved runs            |
-| `--epochs`       | `100`            | Maximum training epochs                  |
-| `--batch-size`   | `256`            | Mini-batch size                          |
-| `--lr`           | `1e-3`           | Initial learning rate                    |
-| `--weight-decay` | `1e-4`           | AdamW weight decay                       |
-| `--patience`     | `15`             | Early-stopping patience (val loss)       |
-| `--seed`         | `42`             | Random seed                              |
-| `--device`       | `auto`           | `auto` \| `cpu` \| `cuda` \| `cuda:N`   |
-| `--workers`      | `4`              | DataLoader worker processes              |
+| Option           | Default          | Description                                |
+| ---------------- | ---------------- | ------------------------------------------ |
+| `--model`        | *(required)*     | Model name from the registry               |
+| `--dataset-dir`  | `data/dataset`   | Root dataset directory                     |
+| `--output-dir`   | `data/models`    | Root directory for saved runs              |
+| `--epochs`       | `100`            | Maximum training epochs                    |
+| `--batch-size`   | `256`            | Mini-batch size                            |
+| `--lr`           | `1e-3`           | Initial learning rate                      |
+| `--weight-decay` | `1e-4`           | AdamW weight decay                         |
+| `--patience`     | `15`             | Early-stopping patience (val loss)         |
+| `--seed`         | `42`             | Random seed                                |
+| `--device`       | `auto`           | `auto` \| `cpu` \| `cuda` \| `cuda:N`      |
+| `--workers`      | `4`              | DataLoader worker processes                |
 | `--preload`      | off              | Load all segments into RAM before training |
-| `--no-normalize` | off              | Skip per-segment z-score normalization   |
-| `--resume`       | —                | Path to a checkpoint `.pt` to resume from |
+| `--no-normalize` | off              | Skip per-segment z-score normalization     |
+| `--resume`       | —                | Path to a checkpoint `.pt` to resume from  |
 
 Run `bin\train-model.bat --help` for the full option listing.
 
