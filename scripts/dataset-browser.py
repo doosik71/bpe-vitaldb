@@ -16,7 +16,9 @@ Options:
 """
 
 import argparse
+import queue
 import sys
+import threading
 import tkinter as tk
 import tkinter.ttk as ttk
 from pathlib import Path
@@ -29,6 +31,7 @@ import matplotlib.font_manager as fm
 import matplotlib.gridspec as gridspec
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from tqdm import tqdm
 
 
 # ── Korean font (no-op if unavailable) ───────────────────────────────────────
@@ -102,17 +105,21 @@ class DatasetBrowser:
         self._split      = "train"
         self._npz_files: dict[str, list[Path]] = {}
         self._rows:       dict[str, list[dict]] = {}
-        self._sort_col    = "case"
-        self._sort_rev    = False
-
+        self._row_by_path: dict[Path, dict] = {}
+        self._metadata_queue: queue.Queue = queue.Queue()
+        self._metadata_total = 0
+        self._metadata_done = 0
+        self._metadata_thread: threading.Thread | None = None
         self._current_path: Path | None = None
         self._x: np.ndarray | None = None   # (N, samples)
         self._y: np.ndarray | None = None   # (N, 2) [SBP, DBP]
         self._seg_idx = 0
+        self._seg_slider_updating = False
 
         self._discover_files()
         self._build_ui()
         self._select_split("train")
+        self._start_metadata_worker()
 
     # ── File discovery ────────────────────────────────────────────────────────
 
@@ -127,20 +134,96 @@ class DatasetBrowser:
             else:
                 files = []
             self._npz_files[split] = files
-            self._rows[split] = [self._file_row(f) for f in files]
+            self._rows[split] = [self._placeholder_row(f) for f in files]
+            for row in self._rows[split]:
+                self._row_by_path[row["path"]] = row
+
+    @staticmethod
+    def _placeholder_row(path: Path) -> dict:
+        cid = int(path.stem) if path.stem.isdigit() else 0
+        return dict(
+            path=path, case=cid, segs=0, segs_text="...",
+            size="...", size_val=0.0, metadata_loaded=False,
+        )
+
+    def _start_metadata_worker(self):
+        self._metadata_total = sum(len(files) for files in self._npz_files.values())
+        if self._metadata_total == 0:
+            return
+
+        self._metadata_thread = threading.Thread(
+            target=self._metadata_worker,
+            name="dataset-metadata-loader",
+            daemon=True,
+        )
+        self._metadata_thread.start()
+        self.root.after(50, self._drain_metadata_queue)
+
+    def _metadata_worker(self):
+        for split in SPLITS:
+            files = self._npz_files[split]
+            for path in tqdm(files, desc=f"Indexing {split}", unit="file"):
+                self._metadata_queue.put(("row", split, path, self._file_row(path)))
+        self._metadata_queue.put(("done", None, None, None))
+
+    def _drain_metadata_queue(self):
+        updated_current = False
+        done = False
+
+        while True:
+            try:
+                kind, split, path, row = self._metadata_queue.get_nowait()
+            except queue.Empty:
+                break
+
+            if kind == "done":
+                done = True
+                continue
+
+            self._metadata_done += 1
+            stored = self._row_by_path.get(path)
+            if stored is None:
+                continue
+
+            stored.update(row)
+            updated_current = updated_current or split == self._split
+
+            if split == self._split:
+                iid = str(path)
+                if self._tree.exists(iid):
+                    self._tree.item(iid, values=self._row_values(stored))
+
+        if updated_current:
+            self._update_count()
+
+        if done:
+            if self._current_path is None:
+                self._status_var.set("Dataset metadata indexing complete.")
+            return
+
+        if self._current_path is None:
+            self._status_var.set(
+                f"Indexing dataset metadata "
+                f"{self._metadata_done}/{self._metadata_total}..."
+            )
+        self.root.after(50, self._drain_metadata_queue)
 
     @staticmethod
     def _file_row(path: Path) -> dict:
         try:
-            data    = np.load(path)
-            n_segs  = len(data["x"])
+            with np.load(path) as data:
+                n_segs = len(data["x"])
         except Exception:
             n_segs  = 0
-        size_kb = path.stat().st_size / 1024
+        try:
+            size_kb = path.stat().st_size / 1024
+        except OSError:
+            size_kb = 0.0
         cid     = int(path.stem) if path.stem.isdigit() else 0
         return dict(
-            path=path, case=cid, segs=n_segs,
+            path=path, case=cid, segs=n_segs, segs_text=str(n_segs),
             size=f"{size_kb:.0f} KB", size_val=size_kb,
+            metadata_loaded=True,
         )
 
     # ── UI construction ───────────────────────────────────────────────────────
@@ -229,8 +312,7 @@ class DatasetBrowser:
             style="D.Treeview", selectmode="browse",
         )
         for cid, heading, width, anchor in self.LIST_COLUMNS:
-            self._tree.heading(cid, text=heading,
-                               command=lambda c=cid: self._sort_by(c))
+            self._tree.heading(cid, text=heading)
             self._tree.column(cid, width=width, anchor=anchor,
                               stretch=(cid == "case"))
 
@@ -312,6 +394,20 @@ class DatasetBrowser:
         self._next_btn = tk.Button(nav, text="Next  ▶", command=self._next_seg, **btn_cfg)
         self._next_btn.pack(side="left", padx=4)
 
+        self._seg_slider = tk.Scale(
+            nav,
+            from_=1, to=1, orient="horizontal",
+            showvalue=False, resolution=1,
+            bg=BG_PANEL, fg=FG_DIM,
+            troughcolor="#2a2a4a",
+            activebackground=ACCENT,
+            highlightthickness=0, bd=0,
+            sliderlength=16, width=10,
+            state="disabled",
+            command=self._on_segment_slider,
+        )
+        self._seg_slider.pack(side="left", fill="x", expand=True, padx=(10, 8))
+
         # Jump-to-segment entry
         tk.Label(
             nav, text="Jump:", bg=BG_PANEL, fg=FG_DIM,
@@ -349,37 +445,43 @@ class DatasetBrowser:
 
     def _refresh_list(self):
         rows = self._sorted_rows()
+        selected = set(self._tree.selection())
         self._tree.delete(*self._tree.get_children())
         for row in rows:
+            iid = str(row["path"])
             self._tree.insert(
                 "", "end",
-                iid=str(row["path"]),
-                values=(row["case"], row["segs"], row["size"]),
+                iid=iid,
+                values=self._row_values(row),
             )
+            if iid in selected:
+                self._tree.selection_add(iid)
+        self._update_count(rows)
+
+    @staticmethod
+    def _row_values(row: dict) -> tuple:
+        return (row["case"], row["segs_text"], row["size"])
+
+    def _update_count(self, rows: list[dict] | None = None):
+        rows = self._rows[self._split] if rows is None else rows
         n = len(rows)
-        total_segs = sum(r["segs"] for r in rows)
-        self._count_var.set(
-            f"{n} cases  ·  {total_segs:,} segments  [{self._split}]"
-        )
+        known = sum(1 for r in rows if r["metadata_loaded"])
+        total_segs = sum(r["segs"] for r in rows if r["metadata_loaded"])
+
+        if known < n:
+            self._count_var.set(
+                f"{n} cases - indexed {known}/{n} - "
+                f"{total_segs:,} segments known [{self._split}]"
+            )
+        else:
+            self._count_var.set(
+                f"{n} cases - {total_segs:,} segments [{self._split}]"
+            )
 
     def _sorted_rows(self) -> list[dict]:
         rows = self._rows[self._split][:]
-        key_map = {
-            "case":  lambda r: r["case"],
-            "segs":  lambda r: r["segs"],
-            "size":  lambda r: r["size_val"],
-        }
-        key = key_map.get(self._sort_col, lambda r: r["case"])
-        rows.sort(key=key, reverse=self._sort_rev)
+        rows.sort(key=lambda r: r["case"])
         return rows
-
-    def _sort_by(self, col: str):
-        if self._sort_col == col:
-            self._sort_rev = not self._sort_rev
-        else:
-            self._sort_col = col
-            self._sort_rev = False
-        self._refresh_list()
 
     # ── Case selection ────────────────────────────────────────────────────────
 
@@ -444,6 +546,15 @@ class DatasetBrowser:
             self._seg_idx += 1
             self._show_segment(self._seg_idx)
 
+    def _on_segment_slider(self, value: str):
+        if self._seg_slider_updating or self._x is None:
+            return
+        idx = int(round(float(value))) - 1
+        idx = max(0, min(idx, len(self._x) - 1))
+        if idx != self._seg_idx:
+            self._seg_idx = idx
+            self._show_segment(idx)
+
     def _on_jump(self, _event=None):
         try:
             idx = int(self._jump_var.get()) - 1  # 1-based input
@@ -454,6 +565,19 @@ class DatasetBrowser:
         except ValueError:
             pass
         self._jump_var.set("")
+
+    def _configure_segment_slider(self, n_segs: int, enabled: bool):
+        self._seg_slider.configure(
+            from_=1, to=max(n_segs, 1),
+            state="normal" if enabled and n_segs > 1 else "disabled",
+        )
+
+    def _set_segment_slider(self, idx: int):
+        self._seg_slider_updating = True
+        try:
+            self._seg_slider.set(idx + 1)
+        finally:
+            self._seg_slider_updating = False
 
     # ── Plotting ──────────────────────────────────────────────────────────────
 
@@ -472,6 +596,7 @@ class DatasetBrowser:
         self._sbp_label.configure(text="")
         self._dbp_label.configure(text="")
         self._seg_var.set("")
+        self._configure_segment_slider(1, enabled=False)
 
     def _show_segment(self, idx: int):
         if self._x is None or self._y is None:
@@ -491,6 +616,8 @@ class DatasetBrowser:
         self._sbp_label.configure(text=f"SBP  {sbp:.0f} mmHg")
         self._dbp_label.configure(text=f"DBP  {dbp:.0f} mmHg")
         self._seg_var.set(f"Segment  {idx + 1} / {n_segs}")
+        self._configure_segment_slider(n_segs, enabled=True)
+        self._set_segment_slider(idx)
 
         # Draw waveform
         ax = self._ax
