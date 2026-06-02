@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Print layer structure and output shapes for BPE model architectures.
+#
+# Usage:
+#   bin/print-model                     # print all models
+#   bin/print-model --model resnet1d    # print one model
+#   bin/print-model --model all         # print all models
+#
+# Model names:
+#   resnet1d  st_resnet  minception  minception_demographic  xresnet1d
+#
+# Options forwarded to scripts/print_model.py:
+#   --model <name|all>   Model to display    (default: all)
+#   --input-length N     PPG segment length  (default: 1000)
+#   --batch-size N       Dummy batch size    (default: 1)
+#   --device cpu|cuda    Compute device      (default: cpu)
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec uv run python scripts/print_model.py "$@"

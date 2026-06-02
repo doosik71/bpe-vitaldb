@@ -53,6 +53,7 @@ bpe-vitaldb/
 │   ├── dataset-browser.bat         # run scripts/dataset-browser.py
 │   ├── share-data.bat              # run scripts/share-data.py (HTTP server)
 │   ├── download-shared-data.bat    # download data/ from a remote share-data host
+│   ├── print-model.bat             # run scripts/print_model.py
 │   └── train-model.bat             # run scripts/train.py
 ├── scripts/
 │   ├── download-vitaldb.py         # parallel .vital file downloader
@@ -60,6 +61,7 @@ bpe-vitaldb/
 │   ├── construct-dataset.py        # build train/val/test NPZ datasets
 │   ├── dataset-browser.py          # GUI dataset segment browser
 │   ├── share-data.py               # multi-threaded HTTP file server
+│   ├── print_model.py              # layer structure and output shape inspector
 │   └── train.py                    # model training pipeline
 ├── data/
 │   ├── vitaldb/                    # downloaded .vital files (git-ignored)
@@ -230,7 +232,47 @@ already-complete files are skipped automatically.
 > Install with `winget install GnuWin32.Wget` or download from
 > [eternallybored.org/misc/wget](https://eternallybored.org/misc/wget/).
 
-### 7. Train a model
+### 7. Inspect model architecture
+
+Print every layer, its output shape, and its parameter count for any registered
+model.  A single forward pass with a dummy input is run internally, so the
+output shapes reflect the actual tensor dimensions at each layer.
+
+```bash
+bin\print-model.bat                          # Windows — print all models
+bin\print-model.bat --model resnet1d         # one model only
+bin/print-model                              # Linux / macOS — print all models
+bin/print-model     --model st_resnet
+```
+
+Example output (truncated):
+
+```text
+============================================================================================
+  Model: resnet1d
+============================================================================================
+Layer (name)                    Type                Output shape        Params
+--------------------------------------------------------------------------------------------
+stem                            Sequential          (1, 32, 250)
+stem.0                          ConvBnAct1d         (1, 32, 500)
+stem.0.0                        Conv1d              (1, 32, 500)           480
+stem.0.1                        BatchNorm1d         (1, 32, 500)            64
+...
+head.fc                         Linear              (1, 2)                 514
+--------------------------------------------------------------------------------------------
+  Total params    : 2,184,866  (2.18 M)
+  Trainable params: 2,184,866  (2.18 M)
+  Input shape     : (1, 1000)
+```
+
+| Option            | Default  | Description                                      |
+| ----------------- | -------- | ------------------------------------------------ |
+| `--model`         | `all`    | Model name or `all`                              |
+| `--input-length`  | `1000`   | PPG segment length in samples (8 s @ 125 Hz)     |
+| `--batch-size`    | `1`      | Batch size for the dummy forward pass            |
+| `--device`        | `cpu`    | `cpu` \| `cuda` \| `auto`                        |
+
+### 8. Train a model
 
 Run the training pipeline against the NPZ dataset built in step 4:
 
