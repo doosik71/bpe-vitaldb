@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Evaluate a trained BPE model on the held-out test set.
+#
+# Loads best.pt from the run directory, runs inference on the test split,
+# and writes evaluation outputs to the same directory:
+#   eval_results.json   — summary metrics (MAE, RMSE, ME, SD; BHS grade; AAMI)
+#   eval_plot.png       — predicted vs actual scatter plots for SBP and DBP
+#   error_hist.png      — error distribution histograms for SBP and DBP
+#
+# Usage:
+#   bin/eval-model <run_dir> [OPTIONS]
+#   bin/eval-model data/models/resnet1d/20260101_120000
+#   bin/eval-model data/models/resnet1d/20260101_120000 --dataset-dir data/dataset
+#   bin/eval-model data/models/resnet1d/20260101_120000 --device cuda
+#
+# Options:
+#   --dataset-dir <path>   Root dataset directory  (default: data/dataset)
+#   --device <spec>        auto | cpu | cuda | cuda:N  (default: auto)
+#   --batch-size <N>       Inference batch size    (default: 512)
+#   --no-normalize         Skip per-segment z-score normalization
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec uv run python scripts/eval.py "$@"

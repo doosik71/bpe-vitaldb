@@ -37,8 +37,8 @@ form the core training dataset for this project.
 ```text
 Phase 1  Data acquisition     ✅  download & browse VitalDB .vital files
 Phase 2  Preprocessing        ✅  segment, filter, align PPG ↔ ABP signals
-Phase 3  Model development        design & train PyTorch architecture
-Phase 4  Evaluation               benchmark against published BPE methods
+Phase 3  Model development    ✅  design & train PyTorch architecture
+Phase 4  Evaluation           ✅  benchmark against published BPE methods
 Phase 5  Analysis                 clinical validation, error analysis
 ```
 
@@ -54,7 +54,9 @@ bpe-vitaldb/
 │   ├── share-data.bat              # run scripts/share-data.py (HTTP server)
 │   ├── download-shared-data.bat    # download data/ from a remote share-data host
 │   ├── print-model.bat             # run scripts/print_model.py
-│   └── train-model.bat             # run scripts/train.py
+│   ├── train-model.bat             # run scripts/train.py
+│   ├── train-status.bat            # run scripts/train-status.py
+│   └── eval-model.bat              # run scripts/eval.py
 ├── scripts/
 │   ├── download-vitaldb.py         # parallel .vital file downloader
 │   ├── vitaldb-browser.py          # GUI waveform browser (tkinter + matplotlib)
@@ -62,7 +64,9 @@ bpe-vitaldb/
 │   ├── dataset-browser.py          # GUI dataset segment browser
 │   ├── share-data.py               # multi-threaded HTTP file server
 │   ├── print_model.py              # layer structure and output shape inspector
-│   └── train.py                    # model training pipeline
+│   ├── train.py                    # model training pipeline
+│   ├── train-status.py             # plot training metrics from a run directory
+│   └── eval.py                     # evaluate best.pt on the test split
 ├── data/
 │   ├── vitaldb/                    # downloaded .vital files (git-ignored)
 │   ├── dataset/                    # NPZ segment files (git-ignored)
@@ -75,8 +79,6 @@ bpe-vitaldb/
 └── README.md
 ```
 
-> **Planned additions**
-> `scripts/evaluate.py` · `src/metrics.py`
 
 ## Getting Started
 
@@ -147,14 +149,14 @@ Windows that contain NaN values or physiologically implausible BP readings are
 discarded.  Cases are split at the **case level** (not segment level) to prevent
 data leakage.
 
-| Option            | Default          | Description                               |
-| ----------------- | ---------------- | ----------------------------------------- |
-| `--data-dir`      | `data/vitaldb`   | Source directory of `.vital` files        |
-| `--output-dir`    | `data/dataset`   | Root output directory                     |
-| `--split`         | `0.6 0.2 0.2`    | Train / val / test case ratios            |
-| `--target-hz`     | `125`            | Output PPG sample rate (Hz)               |
-| `--segment-sec`   | `8`              | Window duration in seconds                |
-| `--seed`          | `42`             | Random seed for case shuffling            |
+| Option          | Default        | Description                        |
+| --------------- | -------------- | ---------------------------------- |
+| `--data-dir`    | `data/vitaldb` | Source directory of `.vital` files |
+| `--output-dir`  | `data/dataset` | Root output directory              |
+| `--split`       | `0.6 0.2 0.2`  | Train / val / test case ratios     |
+| `--target-hz`   | `125`          | Output PPG sample rate (Hz)        |
+| `--segment-sec` | `8`            | Window duration in seconds         |
+| `--seed`        | `42`           | Random seed for case shuffling     |
 
 Each output `.npz` contains:
 
@@ -181,10 +183,10 @@ The browser shows a **unified single window**:
 - **Navigation** — `◀ Prev` / `Next ▶` buttons, a slider for fast scrubbing,
   a jump-to-segment entry field, and keyboard shortcuts
 
-| Keyboard     | Action                   |
-| ------------ | ------------------------ |
-| `←` / `→`    | Previous / next segment  |
-| `↑` / `↓`    | Previous / next case     |
+| Keyboard  | Action                  |
+| --------- | ----------------------- |
+| `←` / `→` | Previous / next segment |
+| `↑` / `↓` | Previous / next case    |
 
 ```bash
 # if the dataset was built with a non-default sample rate:
@@ -209,11 +211,11 @@ bin/share-data 9000
 
 The LAN address is printed on startup, e.g. `http://192.168.1.10:8888/`.
 
-| Option      | Default     | Description                |
-| ----------- | ----------- | -------------------------- |
-| `--port`    | `8888`      | TCP port to listen on      |
-| `--bind`    | `0.0.0.0`   | Bind address               |
-| `--data-dir`| `data`      | Directory to serve         |
+| Option       | Default   | Description           |
+| ------------ | --------- | --------------------- |
+| `--port`     | `8888`    | TCP port to listen on |
+| `--bind`     | `0.0.0.0` | Bind address          |
+| `--data-dir` | `data`    | Directory to serve    |
 
 **On the machine that needs the data (client):**
 
@@ -265,12 +267,12 @@ head.fc                         Linear              (1, 2)                 514
   Input shape     : (1, 1000)
 ```
 
-| Option            | Default  | Description                                      |
-| ----------------- | -------- | ------------------------------------------------ |
-| `--model`         | `all`    | Model name or `all`                              |
-| `--input-length`  | `1000`   | PPG segment length in samples (8 s @ 125 Hz)     |
-| `--batch-size`    | `1`      | Batch size for the dummy forward pass            |
-| `--device`        | `cpu`    | `cpu` \| `cuda` \| `auto`                        |
+| Option           | Default | Description                                  |
+| ---------------- | ------- | -------------------------------------------- |
+| `--model`        | `all`   | Model name or `all`                          |
+| `--input-length` | `1000`  | PPG segment length in samples (8 s @ 125 Hz) |
+| `--batch-size`   | `1`     | Batch size for the dummy forward pass        |
+| `--device`       | `cpu`   | `cpu` \| `cuda` \| `auto`                    |
 
 ### 8. Train a model
 
@@ -283,12 +285,13 @@ bin/train-model     --model resnet1d              # Linux / macOS
 
 Available model architectures:
 
-| Model name             | Description                                      |
-| ---------------------- | ------------------------------------------------ |
-| `resnet1d`             | 1D ResNet — lightweight, fast baseline           |
-| `st_resnet`            | Spectro-Temporal ResNet (PPG + VPG + APG branches) |
-| `minception`           | Multi-scale Inception 1D CNN                     |
-| `xresnet1d`            | Deep XResNet-101-style 1D CNN                    |
+| Model name   | Description                                               |
+| ------------ | --------------------------------------------------------- |
+| `naive`      | Constant predictor — training-set mean SBP/DBP (2 params) |
+| `resnet1d`   | 1D ResNet — lightweight, fast baseline                    |
+| `st_resnet`  | Spectro-Temporal ResNet (PPG + VPG + APG branches)        |
+| `minception` | Multi-scale Inception 1D CNN                              |
+| `xresnet1d`  | Deep XResNet-101-style 1D CNN                             |
 
 Common usage examples:
 
@@ -309,33 +312,79 @@ bin\train-model.bat --model resnet1d --resume data\models\resnet1d\<run-id>\last
 Checkpoints and a metrics CSV are saved under
 `data/models/<model>/<run-id>/`.
 
-| Option           | Default          | Description                              |
-| ---------------- | ---------------- | ---------------------------------------- |
-| `--model`        | *(required)*     | Model name from the registry             |
-| `--dataset-dir`  | `data/dataset`   | Root dataset directory                   |
-| `--output-dir`   | `data/models`    | Root directory for saved runs            |
-| `--epochs`       | `100`            | Maximum training epochs                  |
-| `--batch-size`   | `256`            | Mini-batch size                          |
-| `--lr`           | `1e-3`           | Initial learning rate                    |
-| `--weight-decay` | `1e-4`           | AdamW weight decay                       |
-| `--patience`     | `15`             | Early-stopping patience (val loss)       |
-| `--seed`         | `42`             | Random seed                              |
-| `--device`       | `auto`           | `auto` \| `cpu` \| `cuda` \| `cuda:N`   |
-| `--workers`      | `4`              | DataLoader worker processes              |
-| `--preload`      | off              | Load all segments into RAM before training |
-| `--no-normalize` | off              | Skip per-segment z-score normalization   |
-| `--resume`       | —                | Path to a checkpoint `.pt` to resume from |
+| Option           | Default        | Description                                |
+| ---------------- | -------------- | ------------------------------------------ |
+| `--model`        | *(required)*   | Model name from the registry               |
+| `--dataset-dir`  | `data/dataset` | Root dataset directory                     |
+| `--output-dir`   | `data/models`  | Root directory for saved runs              |
+| `--epochs`       | `100`          | Maximum training epochs                    |
+| `--batch-size`   | `256`          | Mini-batch size                            |
+| `--lr`           | `1e-3`         | Initial learning rate                      |
+| `--weight-decay` | `1e-4`         | AdamW weight decay                         |
+| `--patience`     | `15`           | Early-stopping patience (val loss)         |
+| `--seed`         | `42`           | Random seed                                |
+| `--device`       | `auto`         | `auto` \| `cpu` \| `cuda` \| `cuda:N`      |
+| `--workers`      | `4`            | DataLoader worker processes                |
+| `--preload`      | off            | Load all segments into RAM before training |
+| `--no-normalize` | off            | Skip per-segment z-score normalization     |
+| `--resume`       | —              | Path to a checkpoint `.pt` to resume from  |
 
 Run `bin\train-model.bat --help` for the full option listing.
 
+### 9. Check training status
+
+Plot loss and MAE curves for any run while training is in progress or after it completes:
+
+```bash
+bin\train-status.bat data\models\resnet1d\<run-id>   # Windows
+bin/train-status     data/models/resnet1d/<run-id>   # Linux / macOS
+```
+
+Two PNG files are written next to `metrics.csv` inside the run directory:
+
+| File             | Contents                                                                 |
+| ---------------- | ------------------------------------------------------------------------ |
+| `loss_graph.png` | `train_loss` vs `val_loss` per epoch                                     |
+| `mae_graph.png`  | `train_sbp_mae`, `train_dbp_mae`, `val_sbp_mae`, `val_dbp_mae` per epoch |
+
+A summary table is also printed to the terminal.
+
+| Option      | Default | Description                                |
+| ----------- | ------- | ------------------------------------------ |
+| `--no-save` | off     | Print summary only; skip writing PNG files |
+
+### 10. Evaluate a model
+
+Run the trained model on the held-out test split and compute clinical metrics:
+
+```bash
+bin\eval-model.bat data\models\resnet1d\<run-id>   # Windows
+bin/eval-model     data/models/resnet1d/<run-id>   # Linux / macOS
+```
+
+Three result files are saved in the run directory:
+
+| File                | Contents                                                      |
+| ------------------- | ------------------------------------------------------------- |
+| `eval_results.json` | MAE, RMSE, ME, SD; BHS cumulative error grade; AAMI pass/fail |
+| `eval_plot.png`     | Predicted vs actual scatter plots for SBP and DBP             |
+| `error_hist.png`    | Error distribution histograms for SBP and DBP                 |
+
+| Option           | Default        | Description                            |
+| ---------------- | -------------- | -------------------------------------- |
+| `--dataset-dir`  | `data/dataset` | Root dataset directory                 |
+| `--device`       | `auto`         | `auto` \| `cpu` \| `cuda` \| `cuda:N`  |
+| `--batch-size`   | `512`          | Inference batch size                   |
+| `--no-normalize` | off            | Skip per-segment z-score normalization |
+
 ## Signals of Interest
 
-| Signal               | Track                       | Rate   | Role                      |
-| -------------------- | --------------------------- | ------ | ------------------------- |
-| PPG                  | `SNUADC/PLETH`              | 500 Hz | Model **input**           |
-| Arterial BP waveform | `SNUADC/ART`                | 500 Hz | Ground truth (continuous) |
-| SBP / DBP            | `Solar8000/ART_SBP/DBP`     | ~1 Hz  | Ground truth (numeric)    |
-| ECG II               | `SNUADC/ECG_II`             | 500 Hz | Auxiliary / quality check |
+| Signal               | Track                   | Rate   | Role                      |
+| -------------------- | ----------------------- | ------ | ------------------------- |
+| PPG                  | `SNUADC/PLETH`          | 500 Hz | Model **input**           |
+| Arterial BP waveform | `SNUADC/ART`            | 500 Hz | Ground truth (continuous) |
+| SBP / DBP            | `Solar8000/ART_SBP/DBP` | ~1 Hz  | Ground truth (numeric)    |
+| ECG II               | `SNUADC/ECG_II`         | 500 Hz | Auxiliary / quality check |
 
 ## Environment
 

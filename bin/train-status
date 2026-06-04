@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Show training progress for a BPE model run.
+#
+# Reads metrics.csv from the given run directory and writes:
+#   loss_graph.png  — train_loss vs val_loss per epoch
+#   mae_graph.png   — SBP/DBP MAE (train + val) per epoch
+#
+# Usage:
+#   bin/train-status <run_dir>
+#   bin/train-status data/models/resnet1d/20260101_120000
+#   bin/train-status data/models/resnet1d/20260101_120000 --no-save
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec uv run python scripts/train-status.py "$@"
