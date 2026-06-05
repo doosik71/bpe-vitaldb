@@ -162,8 +162,11 @@ class Trainer:
                 x = x.to(self.device)
                 y = y.to(self.device)
 
-                pred = self.model(x)
-                loss = self.criterion(pred, y)
+                if hasattr(self.model, "compute_loss"):
+                    loss, pred = self.model.compute_loss(x, y, self.criterion)
+                else:
+                    pred = self.model(x)
+                    loss = self.criterion(pred, y)
 
                 if training:
                     self.optimizer.zero_grad()

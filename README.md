@@ -295,6 +295,7 @@ Available model architectures:
 | `minception`             | Multi-scale Inception 1D CNN                       |    134 |  440.7 K  |
 | `minception_demographic` | MInception + age / sex / BMI side-channel fusion   |    143 |  454.6 K  |
 | `xresnet1d`              | Deep XResNet-101-style 1D CNN                      |    484 |   9.47 M  |
+| `mtae`                   | Multi-Task AutoEncoder (reconstruction + BP head)  |     37 | 119.5 K   |
 
 > Layers = total named modules (forward hooks); Params = trainable parameters.  
 > Input: PPG segment (1, 1000) — 8 s @ 125 Hz. `minception_demographic` additionally takes a demographics tensor (1, 3).
