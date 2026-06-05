@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Analyse train / val / test dataset splits and produce summary statistics.
+#
+# Reads every <case>.npz in data/dataset/{train,val,test} and writes:
+#   data/dataset/statistic.json          -- numerical summary (JSON)
+#   data/dataset/bp_distribution.png     -- SBP / DBP density histograms per split
+#   data/dataset/segments_per_case.png   -- per-case segment-count distribution
+#
+# Usage:
+#   bin/dataset-statistic [OPTIONS]
+#   bin/dataset-statistic --dataset-dir data/dataset
+#
+# Options:
+#   --dataset-dir <path>   Root dataset directory  (default: data/dataset)
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec uv run python scripts/dataset-statistic.py "$@"

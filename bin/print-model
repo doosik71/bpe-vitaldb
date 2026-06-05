@@ -7,7 +7,7 @@
 #   bin/print-model --model all         # print all models
 #
 # Model names:
-#   resnet1d  st_resnet  minception  minception_demographic  xresnet1d
+#   resnet1d  st_resnet  minception  xresnet1d
 #
 # Options forwarded to scripts/print_model.py:
 #   --model <name|all>   Model to display    (default: all)

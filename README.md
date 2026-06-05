@@ -293,12 +293,12 @@ Available model architectures:
 | `resnet1d_micro`         | ResNet1D ~10 % depth (1 stage × 1 block)           |     21 |   15.1 K  |
 | `st_resnet`              | Spectro-Temporal ResNet (PPG + VPG + APG branches) |    140 |  478.9 K  |
 | `minception`             | Multi-scale Inception 1D CNN                       |    134 |  440.7 K  |
-| `minception_demographic` | MInception + age / sex / BMI side-channel fusion   |    143 |  454.6 K  |
 | `xresnet1d`              | Deep XResNet-101-style 1D CNN                      |    484 |   9.47 M  |
 | `mtae`                   | Multi-Task AutoEncoder (reconstruction + BP head)  |     37 | 119.5 K   |
+| `mtae_tr`                | MTAE with Transformer encoder/decoder (MAE-style)  |     93 | 109.4 K   |
 
 > Layers = total named modules (forward hooks); Params = trainable parameters.  
-> Input: PPG segment (1, 1000) — 8 s @ 125 Hz. `minception_demographic` additionally takes a demographics tensor (1, 3).
+> Input: PPG segment (1, 1000) — 8 s @ 125 Hz.
 
 Common usage examples:
 

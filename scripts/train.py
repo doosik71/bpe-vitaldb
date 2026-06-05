@@ -7,22 +7,33 @@ Usage:
     uv run python scripts/train.py --model resnet1d [OPTIONS]
 
 Options:
-    --model         Model name from the registry (required)
-                    Available: resnet1d, st_resnet, minception,
-                               xresnet1d, minception_demographic
-    --dataset-dir   Root dataset directory        (default: data/dataset)
-    --output-dir    Root models directory         (default: data/models)
-    --epochs        Maximum training epochs       (default: 100)
-    --batch-size    Mini-batch size               (default: 256)
-    --lr            Initial learning rate         (default: 1e-3)
-    --weight-decay  AdamW weight decay            (default: 1e-4)
-    --patience      Early-stopping patience       (default: 15)
-    --seed          Random seed                   (default: 42)
-    --device        auto | cpu | cuda | cuda:N    (default: auto)
-    --workers       DataLoader worker processes   (default: 4)
-    --preload       Load all segments into RAM before training
-    --no-normalize  Skip per-segment z-score normalization
-    --resume        Path to a checkpoint .pt to resume from
+    --model              Model name from the registry (required)
+                         Available: resnet1d, st_resnet, minception,
+                                    xresnet1d
+    --dataset-dir        Root dataset directory        (default: data/dataset)
+    --output-dir         Root models directory         (default: data/models)
+    --epochs             Maximum training epochs       (default: 100)
+    --batch-size         Mini-batch size               (default: 256)
+    --lr                 Initial learning rate         (default: 1e-3)
+    --weight-decay       AdamW weight decay            (default: 1e-4)
+    --patience           Early-stopping patience       (default: 15)
+    --seed               Random seed                   (default: 42)
+    --device             auto | cpu | cuda | cuda:N    (default: auto)
+    --workers            DataLoader worker processes   (default: 4)
+    --preload            Load all segments into RAM before training
+    --no-normalize       Skip per-segment z-score normalization
+    --resume             Path to a checkpoint .pt to resume from
+
+Augmentation (all enabled by default; use --no-* to disable):
+    --no-aug-noise       Disable Gaussian noise (std=0.01)
+    --no-aug-scale       Disable amplitude scaling (×0.9~1.1)
+    --no-aug-shift       Disable circular time shift (±25 samples)
+    --no-aug-mask        Disable random masking (5~10% of samples)
+
+Patient balancing (enabled by default):
+    --no-patient-balance Disable per-patient WeightedRandomSampler.
+                         By default each patient contributes equally to
+                         every epoch regardless of segment count.
 """
 
 import argparse
@@ -39,6 +50,13 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from bpe.models import create_model, list_models
+from bpe.train.augment import (
+    AmplitudeScaling,
+    GaussianNoise,
+    PPGAugment,
+    RandomMasking,
+    TimeShift,
+)
 from bpe.train.dataset import PPGDataset
 from bpe.train.trainer import Trainer
 
@@ -114,6 +132,36 @@ def parse_args() -> argparse.Namespace:
         "--resume", type=Path, default=None,
         help="Path to a checkpoint .pt file to resume training from",
     )
+
+    # ── Augmentation flags (all default ON; --no-* to disable) ────────────────
+    aug = p.add_argument_group("augmentation (all enabled by default)")
+    aug.add_argument(
+        "--no-aug-noise", dest="aug_noise", action="store_false", default=True,
+        help="Disable Gaussian noise augmentation (std=0.01)",
+    )
+    aug.add_argument(
+        "--no-aug-scale", dest="aug_scale", action="store_false", default=True,
+        help="Disable amplitude scaling augmentation (×0.9~1.1)",
+    )
+    aug.add_argument(
+        "--no-aug-shift", dest="aug_shift", action="store_false", default=True,
+        help="Disable circular time-shift augmentation (±25 samples)",
+    )
+    aug.add_argument(
+        "--no-aug-mask", dest="aug_mask", action="store_false", default=True,
+        help="Disable random masking augmentation (5~10%% of samples)",
+    )
+
+    # ── Patient balancing ─────────────────────────────────────────────────────
+    p.add_argument(
+        "--no-patient-balance", dest="patient_balance", action="store_false",
+        default=True,
+        help=(
+            "Disable per-patient WeightedRandomSampler. "
+            "By default every patient contributes equally per epoch."
+        ),
+    )
+
     return p.parse_args()
 
 
@@ -177,6 +225,31 @@ def main() -> None:
     log.info("Dataset   : %s", args.dataset_dir)
     log.info("Batch size: %d  |  LR: %.2e  |  Epochs: %d", args.batch_size, args.lr, args.epochs)
 
+    # ── Augmentation pipeline ─────────────────────────────────────────────────
+    aug_transforms = []
+    if args.aug_noise:
+        aug_transforms.append(GaussianNoise(std=0.01))
+    if args.aug_scale:
+        aug_transforms.append(AmplitudeScaling(lo=0.9, hi=1.1))
+    if args.aug_shift:
+        aug_transforms.append(TimeShift(max_shift=25))
+    if args.aug_mask:
+        aug_transforms.append(RandomMasking(lo_frac=0.05, hi_frac=0.10))
+    augment = PPGAugment(aug_transforms) if aug_transforms else None
+
+    active = [n for n, f in [
+        ("noise", args.aug_noise), ("scale", args.aug_scale),
+        ("shift", args.aug_shift), ("mask",  args.aug_mask),
+    ] if f]
+    log.info(
+        "Augmentation: %s",
+        ", ".join(active) if active else "disabled",
+    )
+    log.info(
+        "Patient balance: %s",
+        "enabled (WeightedRandomSampler)" if args.patient_balance else "disabled",
+    )
+
     # ── Datasets ─────────────────────────────────────────────────────────────
     normalize = not args.no_normalize
     try:
@@ -184,6 +257,7 @@ def main() -> None:
             args.dataset_dir / "train",
             normalize=normalize,
             preload=args.preload,
+            augment=augment,
         )
         val_ds = PPGDataset(
             args.dataset_dir / "val",
@@ -211,8 +285,16 @@ def main() -> None:
         num_workers = args.workers,
         pin_memory  = device.type == "cuda",
     )
-    train_loader = DataLoader(train_ds, shuffle=True,  **loader_kwargs)
-    val_loader   = DataLoader(val_ds,   shuffle=False, **loader_kwargs)
+    if args.patient_balance:
+        from torch.utils.data import WeightedRandomSampler
+        weights = train_ds.sample_weights()
+        sampler = WeightedRandomSampler(
+            weights, num_samples=len(train_ds), replacement=True
+        )
+        train_loader = DataLoader(train_ds, sampler=sampler, **loader_kwargs)
+    else:
+        train_loader = DataLoader(train_ds, shuffle=True, **loader_kwargs)
+    val_loader = DataLoader(val_ds, shuffle=False, **loader_kwargs)
 
     # ── Model ─────────────────────────────────────────────────────────────────
     try:

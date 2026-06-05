@@ -15,6 +15,7 @@ files it is responsible for.
 """
 
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import torch
@@ -36,6 +37,9 @@ class PPGDataset(Dataset):
         preload:    Load *all* x/y arrays into contiguous NumPy arrays at
                     construction time.  Faster training at the cost of RAM
                     (roughly ``N_segments × segment_len × 4`` bytes).
+        augment:    Optional callable ``(x: Tensor) -> Tensor`` applied to
+                    each PPG segment after normalization.  Pass ``None``
+                    (default) for validation / test sets.
     """
 
     def __init__(
@@ -44,9 +48,11 @@ class PPGDataset(Dataset):
         *,
         normalize: bool = True,
         preload: bool = False,
+        augment: Callable | None = None,
     ):
         self._normalize = normalize
         self._preload   = preload
+        self._augment   = augment
 
         # Build flat segment index: list of (file_idx, local_seg_idx)
         self._files: list[Path] = []
@@ -125,6 +131,9 @@ class PPGDataset(Dataset):
             std = x.std()
             x = (x - x.mean()) / std.clamp_min(1e-6)
 
+        if self._augment is not None:
+            x = self._augment(x)
+
         return x, y
 
     # ── Metadata helpers ──────────────────────────────────────────────────────
@@ -137,3 +146,24 @@ class PPGDataset(Dataset):
     def segment_length(self) -> int:
         """Length (number of samples) of a single PPG segment."""
         return int(self._segs and self._get_arrays(0)[0].shape[1] or 0)
+
+    def sample_weights(self) -> torch.Tensor:
+        """Per-segment weights for WeightedRandomSampler.
+
+        Each segment is assigned weight ``1 / n`` where ``n`` is the total
+        number of segments belonging to the same source file (patient case).
+        This gives every patient equal expected representation per epoch,
+        regardless of how many segments their recording contributes.
+
+        Returns:
+            Float tensor of shape ``(len(self),)`` suitable for passing
+            directly to ``torch.utils.data.WeightedRandomSampler``.
+        """
+        file_counts: list[int] = [0] * len(self._files)
+        for file_idx, _ in self._segs:
+            file_counts[file_idx] += 1
+
+        weights = torch.zeros(len(self._segs))
+        for i, (file_idx, _) in enumerate(self._segs):
+            weights[i] = 1.0 / file_counts[file_idx]
+        return weights

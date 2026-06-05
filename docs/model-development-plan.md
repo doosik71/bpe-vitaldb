@@ -109,7 +109,6 @@ abp_transformer
 
 - `st_resnet`: PPG/VPG/APG 3-channel 입력
 - `minception`: multi-scale convolution branches
-- metadata가 준비되면 `minception_demographic` variant 추가
 
 성공 기준:
 

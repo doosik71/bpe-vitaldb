@@ -217,14 +217,6 @@ def main() -> None:
         print("ERROR: 'model' key missing from config.json.", file=sys.stderr)
         sys.exit(1)
 
-    if model_name == "minception_demographic":
-        print(
-            "ERROR: minception_demographic requires demographic inputs not available "
-            "in the standard test split.  Evaluation is not supported for this model.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     print(f"Run directory : {run_dir}")
     print(f"Model         : {model_name}")
     print(f"Checkpoint    : {ckpt_path}")

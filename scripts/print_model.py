@@ -140,10 +140,6 @@ def _make_inputs(
     """Return (args, kwargs) for a forward call appropriate to each model."""
     ppg = torch.randn(batch, length, device=device)
 
-    if model_name == "minception_demographic":
-        demo = torch.randn(batch, 3, device=device)          # age, sex, BMI
-        return (ppg,), {"demographics": demo}
-
     return (ppg,), {}
 
 
@@ -187,7 +183,6 @@ def print_model_summary(
     print(f"  Trainable params: {trainable:,}  ({_fmt_params(trainable)})")
     print(
         f"  Input shape     : ({batch_size}, {input_length})"
-        + (f"  +  demographics ({batch_size}, 3)" if model_name == "minception_demographic" else "")
     )
 
 

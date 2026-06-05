@@ -1,8 +1,8 @@
 """Model registry and direct SBP/DBP regression architectures."""
 
 from bpe.models.minception import MInception
-from bpe.models.minception_demographic import MInceptionDemographic
 from bpe.models.mtae import MTAE
+from bpe.models.mtae_tr import MTAE_TR
 from bpe.models.naive import NaiveConstant
 from bpe.models.pulse_resnet1d import PulseResNet1D
 from bpe.models.pulsew_resnet1d import PulseWResNet1D
@@ -22,8 +22,8 @@ from bpe.models.xresnet1d import XResNet1D101
 
 __all__ = [
     "MInception",
-    "MInceptionDemographic",
     "MTAE",
+    "MTAE_TR",
     "NaiveConstant",
     "PulseResNet1D",
     "PulseWResNet1D",

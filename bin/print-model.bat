@@ -7,7 +7,7 @@ rem   bin\print-model.bat --model resnet1d    print one model
 rem   bin\print-model.bat --model all         print all models
 rem
 rem Model names:
-rem   resnet1d  st_resnet  minception  minception_demographic  xresnet1d
+rem   resnet1d  st_resnet  minception  xresnet1d
 rem
 rem Options forwarded to scripts/print_model.py:
 rem   --model <name|all>   Model to display   (default: all)
