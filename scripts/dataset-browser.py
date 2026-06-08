@@ -48,22 +48,22 @@ _set_cjk_font()
 
 SPLITS = ("train", "val", "test")
 
-# Dark colour palette
-BG_DARK   = "#0d0d1f"
-BG_MID    = "#1a1a2e"
-BG_PANEL  = "#111128"
-FG_DIM    = "#666688"
-FG_NORM   = "#ccccdd"
-FG_BRIGHT = "#aaaaff"
-ACCENT    = "#3344aa"
+# Light colour palette
+BG_DARK   = "#ffffff"
+BG_MID    = "#f0f0f7"
+BG_PANEL  = "#e8e8f2"
+FG_DIM    = "#888899"
+FG_NORM   = "#222233"
+FG_BRIGHT = "#1133cc"
+ACCENT    = "#2255cc"
 
-PPG_COLOR = "#00cc88"
-SBP_COLOR = "#ff6644"
-DBP_COLOR = "#ffaa00"
-GRID_CLR  = "#1e1e3a"
+PPG_COLOR = "#1a8855"
+SBP_COLOR = "#cc2200"
+DBP_COLOR = "#cc7700"
+GRID_CLR  = "#e8e8ee"
 
-SPLIT_BTN_ACTIVE   = {"bg": "#3344aa", "fg": "white",    "relief": "flat"}
-SPLIT_BTN_INACTIVE = {"bg": "#1a1a2e", "fg": "#666688",  "relief": "flat"}
+SPLIT_BTN_ACTIVE   = {"bg": "#2255cc", "fg": "white",    "relief": "flat"}
+SPLIT_BTN_INACTIVE = {"bg": "#f0f0f7", "fg": "#666677",  "relief": "flat"}
 
 
 # ── argparse ──────────────────────────────────────────────────────────────────
@@ -297,7 +297,7 @@ class DatasetBrowser:
         )
         style.configure(
             "D.Treeview.Heading",
-            background="#2a2a5a", foreground=FG_BRIGHT,
+            background="#d0d8f0", foreground=FG_BRIGHT,
             font=("Segoe UI", 9, "bold"), relief="flat",
         )
         style.map(
@@ -356,7 +356,7 @@ class DatasetBrowser:
         self._placeholder = tk.Label(
             parent,
             text="← Select a case from the list",
-            bg=BG_DARK, fg="#333355",
+            bg=BG_DARK, fg="#aaaacc",
             font=("Segoe UI", 14),
         )
         self._placeholder.pack(expand=True)
@@ -377,12 +377,12 @@ class DatasetBrowser:
 
         btn_cfg = dict(
             font=("Segoe UI", 9, "bold"),
-            bg="#2a2a5a", fg=FG_BRIGHT,
+            bg="#d0d8f0", fg=FG_BRIGHT,
             activebackground=ACCENT, activeforeground="white",
             relief="flat", bd=0, padx=16, pady=4,
             cursor="hand2",
         )
-        self._prev_btn = tk.Button(nav, text="◀  Prev", command=self._prev_seg, **btn_cfg)
+        self._prev_btn = tk.Button(nav, text="< Prev", command=self._prev_seg, **btn_cfg)
         self._prev_btn.pack(side="left", padx=8, pady=4)
 
         self._seg_var = tk.StringVar(value="")
@@ -391,7 +391,7 @@ class DatasetBrowser:
             bg=BG_PANEL, fg=FG_DIM, font=("Segoe UI", 9), width=20,
         ).pack(side="left", padx=4)
 
-        self._next_btn = tk.Button(nav, text="Next  ▶", command=self._next_seg, **btn_cfg)
+        self._next_btn = tk.Button(nav, text="Next >", command=self._next_seg, **btn_cfg)
         self._next_btn.pack(side="left", padx=4)
 
         self._seg_slider = tk.Scale(
@@ -399,7 +399,7 @@ class DatasetBrowser:
             from_=1, to=1, orient="horizontal",
             showvalue=False, resolution=1,
             bg=BG_PANEL, fg=FG_DIM,
-            troughcolor="#2a2a4a",
+            troughcolor="#ccccdd",
             activebackground=ACCENT,
             highlightthickness=0, bd=0,
             sliderlength=16, width=10,
@@ -416,8 +416,8 @@ class DatasetBrowser:
         self._jump_var = tk.StringVar()
         jump_entry = tk.Entry(
             nav, textvariable=self._jump_var,
-            width=6, bg="#2a2a4a", fg="white",
-            insertbackground="white", relief="flat", font=("Segoe UI", 9),
+            width=6, bg="#ccccdd", fg=FG_NORM,
+            insertbackground=FG_NORM, relief="flat", font=("Segoe UI", 9),
         )
         jump_entry.pack(side="left")
         jump_entry.bind("<Return>", self._on_jump)
@@ -638,7 +638,7 @@ class DatasetBrowser:
         ax.set_ylabel("PPG amplitude", color=FG_DIM, fontsize=9)
         ax.tick_params(colors=FG_DIM, labelsize=8)
         for spine in ax.spines.values():
-            spine.set_edgecolor("#2a2a4a")
+            spine.set_edgecolor("#ccccdd")
         ax.grid(True, color=GRID_CLR, linewidth=0.5, linestyle="--", alpha=0.7)
 
         # SBP / DBP text annotation inside the plot

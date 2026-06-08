@@ -47,23 +47,23 @@ STEP_SEC = 10     # navigation step (s)
 
 # (track_name, label, color, is_waveform)
 TRACK_DEFS = [
-    ("SNUADC/PLETH",      "PPG",           "#00cc88", True),
-    ("SNUADC/ART",        "ABP",           "#e05050", True),
-    ("SNUADC/ECG_II",     "ECG II",        "#5588ff", True),
-    ("Solar8000/ART_SBP", "SBP (mmHg)",    "#ff6644", False),
-    ("Solar8000/ART_DBP", "DBP (mmHg)",    "#ffaa00", False),
-    ("Solar8000/ART_MBP", "MBP (mmHg)",    "#ff88cc", False),
-    ("Solar8000/HR",      "HR (/min)",     "#44ddff", False),
+    ("SNUADC/PLETH",      "PPG",           "#1a8855", True),
+    ("SNUADC/ART",        "ABP",           "#cc2200", True),
+    ("SNUADC/ECG_II",     "ECG II",        "#2255bb", True),
+    ("Solar8000/ART_SBP", "SBP (mmHg)",    "#cc2200", False),
+    ("Solar8000/ART_DBP", "DBP (mmHg)",    "#cc7700", False),
+    ("Solar8000/ART_MBP", "MBP (mmHg)",    "#cc4488", False),
+    ("Solar8000/HR",      "HR (/min)",     "#0088bb", False),
 ]
 WAVE_TRACKS = [(n, l, c) for n, l, c, w in TRACK_DEFS if w]
 NUMERIC_TRACKS = [(n, l, c) for n, l, c, w in TRACK_DEFS if not w]
 
 # Row highlight tags: (foreground, background)
 TAG_COLORS = {
-    "none":    ("#ccccdd", "#0d0d1f"),
-    "ppg":     ("#44ffaa", "#0d0d1f"),   # bright green text
-    "abp":     ("#ccccdd", "#400d0d"),   # dark crimson bg
-    "ppg_abp": ("#44ffaa", "#400d0d"),   # both
+    "none":    ("#222233", "#ffffff"),
+    "ppg":     ("#228844", "#d0d0d0"),   # dark green text, gray background
+    "abp":     ("#222233", "#fdecea"),   # normal text, light red tint
+    "ppg_abp": ("#228844", "#fdecea"),   # both
 }
 
 
@@ -219,82 +219,82 @@ class VitalDBBrowser:
 
     def _build_ui(self):
         self.root.title("VitalDB Browser")
-        self.root.configure(bg="#1a1a2e")
+        self.root.configure(bg="#f0f0f7")
         self.root.geometry(f"{self.LIST_WIDTH + self.CANVAS_W}x{self.WIN_H}")
         self.root.minsize(900, 500)
 
         # ── Top-level paned window ────────────────────────────────────────────
         paned = tk.PanedWindow(self.root, orient="horizontal",
-                               bg="#1a1a2e", sashwidth=5, sashrelief="flat",
+                               bg="#f0f0f7", sashwidth=5, sashrelief="flat",
                                handlesize=0)
         paned.pack(fill="both", expand=True)
 
         # ── Left panel ───────────────────────────────────────────────────────
-        left = tk.Frame(paned, bg="#1a1a2e", width=self.LIST_WIDTH)
+        left = tk.Frame(paned, bg="#f0f0f7", width=self.LIST_WIDTH)
         left.pack_propagate(False)
         paned.add(left, minsize=280)
 
         self._build_list_panel(left)
 
         # ── Right panel ──────────────────────────────────────────────────────
-        right = tk.Frame(paned, bg="#0d0d1f")
+        right = tk.Frame(paned, bg="#ffffff")
         paned.add(right, minsize=500)
 
         self._build_canvas_panel(right)
 
         # ── Bottom status bar ─────────────────────────────────────────────────
-        bar = tk.Frame(self.root, bg="#111128", height=22)
+        bar = tk.Frame(self.root, bg="#e8e8f2", height=22)
         bar.pack(fill="x", side="bottom")
         bar.pack_propagate(False)
 
         self._status_var = tk.StringVar(value="Select a case from the list.")
         tk.Label(bar, textvariable=self._status_var,
-                 bg="#111128", fg="#666688",
+                 bg="#e8e8f2", fg="#888899",
                  font=("Segoe UI", 9), anchor="w").pack(side="left", padx=8)
 
     # ── Left panel: case list ─────────────────────────────────────────────────
 
     def _build_list_panel(self, parent: tk.Frame):
         # Search bar
-        top = tk.Frame(parent, bg="#1a1a2e")
+        top = tk.Frame(parent, bg="#f0f0f7")
         top.pack(fill="x", padx=8, pady=(8, 4))
 
-        tk.Label(top, text="Search:", bg="#1a1a2e", fg="#aaaacc",
+        tk.Label(top, text="Search:", bg="#f0f0f7", fg="#888899",
                  font=("Segoe UI", 9)).pack(side="left")
         self._search_var = tk.StringVar()
         self._search_var.trace_add("write", lambda *_: self._refresh_list())
         tk.Entry(top, textvariable=self._search_var,
-                 bg="#2a2a4a", fg="white", insertbackground="white",
+                 bg="#ccccdd", fg="#222233", insertbackground="#222233",
                  relief="flat", font=("Segoe UI", 9), width=18
                  ).pack(side="left", padx=(4, 0))
 
         # Legend
-        legend = tk.Frame(parent, bg="#1a1a2e")
+        legend = tk.Frame(parent, bg="#f0f0f7")
         legend.pack(fill="x", padx=8, pady=(0, 4))
-        tk.Label(legend, text="●", bg="#1a1a2e", fg="#44ffaa",
+        tk.Label(legend, text="●", bg="#f0f0f7", fg="#228844",
                  font=("Segoe UI", 9)).pack(side="left")
-        tk.Label(legend, text="PPG  ", bg="#1a1a2e", fg="#888899",
+        tk.Label(legend, text="PPG  ", bg="#f0f0f7", fg="#888899",
                  font=("Segoe UI", 9)).pack(side="left")
-        tk.Label(legend, text="■", bg="#280d0d", fg="#ff6666",
+        tk.Label(legend, text="■", bg="#fde8e8", fg="#cc2200",
                  font=("Segoe UI", 9)).pack(side="left")
-        tk.Label(legend, text="ABP", bg="#1a1a2e", fg="#888899",
+        tk.Label(legend, text="ABP", bg="#f0f0f7", fg="#888899",
                  font=("Segoe UI", 9)).pack(side="left")
 
         # Treeview
-        frame = tk.Frame(parent, bg="#1a1a2e")
+        frame = tk.Frame(parent, bg="#f0f0f7")
         frame.pack(fill="both", expand=True, padx=8, pady=(0, 4))
 
         style = ttk.Style()
         style.theme_use("clam")
         style.configure("L.Treeview",
-                        background="#0d0d1f", foreground="#ccccdd",
-                        fieldbackground="#0d0d1f", rowheight=22,
+                        background="#ffffff", foreground="#222233",
+                        fieldbackground="#ffffff", rowheight=22,
                         font=("Segoe UI", 9))
         style.configure("L.Treeview.Heading",
-                        background="#2a2a5a", foreground="#aaaaff",
+                        background="#d0d8f0", foreground="#1133cc",
                         font=("Segoe UI", 9, "bold"), relief="flat")
         style.map("L.Treeview",
-                  background=[("selected", "#3344aa")],
+                  background=[("selected", "#2255cc")],
                   foreground=[("selected", "white")])
 
         col_ids = [c[0] for c in self.LIST_COLUMNS]
@@ -320,7 +320,7 @@ class VitalDBBrowser:
         # List status
         self._list_status = tk.StringVar()
         tk.Label(parent, textvariable=self._list_status,
-                 bg="#1a1a2e", fg="#666688",
+                 bg="#f0f0f7", fg="#888899",
                  font=("Segoe UI", 8), anchor="w").pack(fill="x", padx=8, pady=(0, 4))
 
     # ── Right panel: matplotlib canvas ───────────────────────────────────────
@@ -330,19 +330,19 @@ class VitalDBBrowser:
         self._placeholder = tk.Label(
             parent,
             text="← Select a case from the list",
-            bg="#0d0d1f", fg="#333355",
+            bg="#ffffff", fg="#aaaacc",
             font=("Segoe UI", 14),
         )
         self._placeholder.pack(expand=True)
 
         # Figure (hidden until a case is loaded)
-        self._fig = plt.Figure(facecolor="#1a1a2e")
+        self._fig = plt.Figure(facecolor="#f0f0f7")
         self._canvas = FigureCanvasTkAgg(self._fig, master=parent)
         self._canvas_widget = self._canvas.get_tk_widget()
         # Not packed yet — shown after first case load
 
         # Navigation bar below the canvas
-        self._nav_frame = tk.Frame(parent, bg="#1a1a2e")
+        self._nav_frame = tk.Frame(parent, bg="#f0f0f7")
         # Also deferred
 
     def _show_canvas(self):
@@ -354,12 +354,12 @@ class VitalDBBrowser:
             self._build_nav_bar(self._nav_frame)
 
     def _build_nav_bar(self, parent: tk.Frame):
-        bc = "#2a2a5a"
-        hc = "#4455aa"
-        kw = dict(bg=bc, fg="white", activebackground=hc, activeforeground="white",
+        bc = "#d0d8f0"
+        hc = "#3366cc"
+        kw = dict(bg=bc, fg="#222233", activebackground=hc, activeforeground="white",
                   relief="flat", font=("Segoe UI", 9), padx=10, pady=3, cursor="hand2")
 
-        bar = tk.Frame(parent, bg="#1a1a2e")
+        bar = tk.Frame(parent, bg="#f0f0f7")
         bar.pack(fill="x", padx=6, pady=(2, 4))
 
         tk.Button(bar, text="<< 60s", command=lambda: self._shift(-60),
@@ -371,7 +371,7 @@ class VitalDBBrowser:
         self._tk_slider = tk.Scale(
             bar, orient="horizontal", from_=0, to=1,
             resolution=1, showvalue=False,
-            bg="#1a1a2e", fg="#aaaacc", troughcolor="#2a2a4a",
+            bg="#f0f0f7", fg="#888899", troughcolor="#ccccdd",
             highlightthickness=0, bd=0, sliderlength=14,
             command=self._on_tk_slider,
         )
@@ -382,13 +382,13 @@ class VitalDBBrowser:
         tk.Button(bar, text="60s >>", command=lambda: self._shift(+60),
                   **kw).pack(side="left", padx=2)
 
-        kw2 = dict(kw, bg="#1a3a4a", activebackground="#2a5a6a")
+        kw2 = dict(kw, bg="#d0dde8", activebackground="#3366cc")
         tk.Button(bar, text="Track Info", command=self._show_track_info,
                   **kw2).pack(side="right", padx=(8, 2))
 
         self._nav_time = tk.StringVar()
         tk.Label(bar, textvariable=self._nav_time,
-                 bg="#1a1a2e", fg="#aaaacc",
+                 bg="#f0f0f7", fg="#888899",
                  font=("Consolas", 9)).pack(side="right", padx=8)
 
         # Keyboard bindings on root
@@ -548,7 +548,7 @@ class VitalDBBrowser:
                      f"{str(row.get('opname',''))[:38]}  |  Ane: {row.get('ane_type','?')}")
         except Exception:
             title = f"Case {caseid}"
-        self._fig.suptitle(title, color="white", fontsize=10, y=0.99)
+        self._fig.suptitle(title, color="#222233", fontsize=10, y=0.99)
 
         # Update slider range
         if hasattr(self, "_tk_slider"):
@@ -579,7 +579,7 @@ class VitalDBBrowser:
 
         for ax, (name, label, color) in zip(self._wave_axes, self._avail_waves):
             ax.cla()
-            ax.set_facecolor("#0d0d1f")
+            ax.set_facecolor("#ffffff")
             t, y = self._wave_slice(name)
             valid = ~np.isnan(y)
             if valid.any():
@@ -590,11 +590,11 @@ class VitalDBBrowser:
                 ax.set_ylim(p1 - margin, p99 + margin)
             else:
                 ax.text(0.5, 0.5, "No data", transform=ax.transAxes,
-                        ha="center", va="center", color="#444466", fontsize=9)
+                        ha="center", va="center", color="#888899", fontsize=9)
             ax.set_xlim(self._t0, t_end)
             ax.set_ylabel(label, color=color, fontsize=8, labelpad=2)
-            ax.tick_params(colors="#666688", labelsize=7)
-            ax.spines[:].set_color("#222244")
+            ax.tick_params(colors="#888899", labelsize=7)
+            ax.spines[:].set_color("#ccccdd")
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
 
@@ -603,11 +603,11 @@ class VitalDBBrowser:
             plt.setp(ax.get_xticklabels(), visible=False)
         if self._wave_axes:
             self._wave_axes[-1].set_xlabel("Time (s)",
-                                           color="#aaaacc", fontsize=8)
+                                           color="#888899", fontsize=8)
 
         if self._num_ax:
             self._num_ax.cla()
-            self._num_ax.set_facecolor("#0d0d1f")
+            self._num_ax.set_facecolor("#ffffff")
             for name, label, color in self._avail_numeric:
                 t, y = self._num_slice(name)
                 valid = ~np.isnan(y)
@@ -615,12 +615,12 @@ class VitalDBBrowser:
                     self._num_ax.plot(t[valid], y[valid], color=color,
                                       lw=1.1, marker=".", ms=2, label=label)
             self._num_ax.set_xlim(self._t0, t_end)
-            self._num_ax.set_ylabel("Numeric", color="white", fontsize=8)
-            self._num_ax.set_xlabel("Time (s)", color="#aaaacc", fontsize=8)
+            self._num_ax.set_ylabel("Numeric", color="#222233", fontsize=8)
+            self._num_ax.set_xlabel("Time (s)", color="#888899", fontsize=8)
             self._num_ax.legend(loc="upper right", fontsize=7, framealpha=0.3,
-                                labelcolor="white", facecolor="#0d0d1f")
-            self._num_ax.tick_params(colors="#666688", labelsize=7)
-            self._num_ax.spines[:].set_color("#222244")
+                                labelcolor="#222233", facecolor="#ffffff")
+            self._num_ax.tick_params(colors="#888899", labelsize=7)
+            self._num_ax.spines[:].set_color("#ccccdd")
             self._num_ax.spines["top"].set_visible(False)
             self._num_ax.spines["right"].set_visible(False)
 
@@ -663,24 +663,24 @@ class VitalDBBrowser:
 
         win = tk.Toplevel(self.root)
         win.title(f"Track Info — Case {self._current_path.stem}")
-        win.configure(bg="#1a1a2e")
+        win.configure(bg="#f0f0f7")
         win.geometry("620x460")
 
         cols = [("track", "Track Name", 255, "w"), ("type", "Type", 88, "center"),
                 ("unit", "Unit", 68, "center"), ("recs", "Records", 68, "center")]
-        frame = tk.Frame(win, bg="#1a1a2e")
+        frame = tk.Frame(win, bg="#f0f0f7")
         frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         style = ttk.Style()
         style.configure("TI.Treeview",
-                        background="#0d0d1f", foreground="#ccccdd",
-                        fieldbackground="#0d0d1f", rowheight=21,
+                        background="#ffffff", foreground="#222233",
+                        fieldbackground="#ffffff", rowheight=21,
                         font=("Consolas", 9))
         style.configure("TI.Treeview.Heading",
-                        background="#2a2a5a", foreground="#aaaaff",
+                        background="#d0d8f0", foreground="#1133cc",
                         font=("Segoe UI", 9, "bold"), relief="flat")
         style.map("TI.Treeview",
-                  background=[("selected", "#3344aa")],
+                  background=[("selected", "#2255cc")],
                   foreground=[("selected", "white")])
 
         col_ids = [c[0] for c in cols]
@@ -703,17 +703,17 @@ class VitalDBBrowser:
             tree.insert("", "end", values=(
                 name, kind, unit, len(trk.recs)), tags=(tag,))
 
-        tree.tag_configure("even", background="#0d0d1f")
-        tree.tag_configure("odd",  background="#111128")
+        tree.tag_configure("even", background="#ffffff")
+        tree.tag_configure("odd",  background="#e8e8f2")
 
-        bot = tk.Frame(win, bg="#1a1a2e")
+        bot = tk.Frame(win, bg="#f0f0f7")
         bot.pack(fill="x", padx=10, pady=(0, 10))
         n_w = sum(1 for t in self._vf.trks.values() if t.srate > 0)
         n_n = sum(1 for t in self._vf.trks.values() if t.srate == 0)
         tk.Label(bot, text=f"{len(self._vf.trks)} tracks — {n_w} waveform, {n_n} numeric",
-                 bg="#1a1a2e", fg="#666688", font=("Segoe UI", 9)).pack(side="left")
+                 bg="#f0f0f7", fg="#888899", font=("Segoe UI", 9)).pack(side="left")
         tk.Button(bot, text="Close", command=win.destroy,
-                  bg="#2a2a5a", fg="white", activebackground="#4455aa",
+                  bg="#d0d8f0", fg="#222233", activebackground="#3366cc",
                   activeforeground="white", relief="flat",
                   font=("Segoe UI", 9), padx=12, pady=3, cursor="hand2"
                   ).pack(side="right")
