@@ -8,10 +8,10 @@
 #   error_hist.png      — error distribution histograms for SBP and DBP
 #
 # Usage:
-#   bin/eval-model <run_dir> [OPTIONS]
-#   bin/eval-model data/models/resnet1d/20260101_120000
-#   bin/eval-model data/models/resnet1d/20260101_120000 --dataset-dir data/dataset
-#   bin/eval-model data/models/resnet1d/20260101_120000 --device cuda
+#   bin/eval-model-pulsewoq <run_dir> [OPTIONS]
+#   bin/eval-model-pulsewoq data/models/resnet1d/20260101_120000
+#   bin/eval-model-pulsewoq data/models/resnet1d/20260101_120000 --dataset-dir data/dataset
+#   bin/eval-model-pulsewoq data/models/resnet1d/20260101_120000 --device cuda
 #
 # Options:
 #   --dataset-dir <path>   Root dataset directory  (default: data/dataset)
@@ -21,4 +21,4 @@
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
-exec uv run python scripts/eval-model.py "$@"
+exec uv run python scripts/eval-model-pulsewoq.py "$@"

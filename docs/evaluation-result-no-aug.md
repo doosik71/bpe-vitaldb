@@ -11,7 +11,7 @@
 전처리(125 Hz, 8초 세그먼트, z-score 정규화), 동일한 하이퍼파라미터(AdamW, lr=1e-3,
 batch=256, patience=15, seed=42)로 학습되어 공정한 비교가 가능하다.
 
-평가는 `scripts/eval.py`를 사용하며 `best.pt` 체크포인트(validation loss 기준)를
+평가는 `scripts/eval-model.py`를 사용하며 `best.pt` 체크포인트(validation loss 기준)를
 테스트셋에 단 1회 적용하는 방식으로 수행된다.
 
 ## 2. 평가 환경

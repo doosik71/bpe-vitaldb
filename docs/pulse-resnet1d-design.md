@@ -112,7 +112,7 @@ bpe/models/__init__.py         ← PulseResNet1D import + __all__ 추가
    - `PulseBackbone`: 3-stage ResNet, 125 샘플 입력 전용
    - `PulseResNet1D`: 분할 → 백본 → 평균 집계, `@register_model("pulse_resnet1d")`
 2. `bpe/models/__init__.py`에 import 추가
-3. `uv run python scripts/print_model.py --model pulse_resnet1d` 로 레이어 구조 확인
+3. `uv run python scripts/print-model.py --model pulse_resnet1d` 로 레이어 구조 확인
 4. `uv run python scripts/train.py --model pulse_resnet1d` 로 단기 학습 실행하여
    기존 `resnet1d`와 val MAE 비교
 

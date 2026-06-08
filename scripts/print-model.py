@@ -5,9 +5,9 @@ Runs a single forward pass with a dummy input and captures the output shape
 of every named module via forward hooks.
 
 Usage:
-    uv run python scripts/print_model.py --model resnet1d
-    uv run python scripts/print_model.py --model all
-    uv run python scripts/print_model.py           # same as --model all
+    uv run python scripts/print-model.py --model resnet1d
+    uv run python scripts/print-model.py --model all
+    uv run python scripts/print-model.py           # same as --model all
 
 Options:
     --model         Model name or "all"                (default: all)

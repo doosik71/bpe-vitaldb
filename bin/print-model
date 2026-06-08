@@ -9,7 +9,7 @@
 # Model names:
 #   resnet1d  st_resnet  minception  xresnet1d
 #
-# Options forwarded to scripts/print_model.py:
+# Options forwarded to scripts/print-model.py:
 #   --model <name|all>   Model to display    (default: all)
 #   --input-length N     PPG segment length  (default: 1000)
 #   --batch-size N       Dummy batch size    (default: 1)
@@ -17,4 +17,4 @@
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
-exec uv run python scripts/print_model.py "$@"
+exec uv run python scripts/print-model.py "$@"

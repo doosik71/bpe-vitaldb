@@ -7,6 +7,7 @@ from bpe.models.naive import NaiveConstant
 from bpe.models.pulse_resnet1d import PulseResNet1D
 from bpe.models.pulsew_resnet1d import PulseWResNet1D
 from bpe.models.pulsewo_resnet1d import PulseWOResNet1D
+from bpe.models.pulsewoq_resnet1d import PulseWOQResNet1D
 from bpe.models.registry import (
     create_model,
     get_model_class,
@@ -28,6 +29,7 @@ __all__ = [
     "PulseResNet1D",
     "PulseWResNet1D",
     "PulseWOResNet1D",
+    "PulseWOQResNet1D",
     "ResNet1D",
     "ResNet1DMicro",
     "ResNet1DMini",

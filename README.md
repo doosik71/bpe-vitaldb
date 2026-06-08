@@ -53,20 +53,20 @@ bpe-vitaldb/
 │   ├── dataset-browser.bat         # run scripts/dataset-browser.py
 │   ├── share-data.bat              # run scripts/share-data.py (HTTP server)
 │   ├── download-shared-data.bat    # download data/ from a remote share-data host
-│   ├── print-model.bat             # run scripts/print_model.py
+│   ├── print-model.bat             # run scripts/print-model.py
 │   ├── train-model.bat             # run scripts/train.py
 │   ├── train-status.bat            # run scripts/train-status.py
-│   └── eval-model.bat              # run scripts/eval.py
+│   └── eval-model.bat              # run scripts/eval-model.py
 ├── scripts/
 │   ├── download-vitaldb.py         # parallel .vital file downloader
 │   ├── vitaldb-browser.py          # GUI waveform browser (tkinter + matplotlib)
 │   ├── construct-dataset.py        # build train/val/test NPZ datasets
 │   ├── dataset-browser.py          # GUI dataset segment browser
 │   ├── share-data.py               # multi-threaded HTTP file server
-│   ├── print_model.py              # layer structure and output shape inspector
+│   ├── print-model.py              # layer structure and output shape inspector
 │   ├── train.py                    # model training pipeline
 │   ├── train-status.py             # plot training metrics from a run directory
-│   └── eval.py                     # evaluate best.pt on the test split
+│   └── eval-model.py                     # evaluate best.pt on the test split
 ├── data/
 │   ├── vitaldb/                    # downloaded .vital files (git-ignored)
 │   ├── dataset/                    # NPZ segment files (git-ignored)
@@ -296,6 +296,7 @@ Available model architectures:
 | `xresnet1d`              | Deep XResNet-101-style 1D CNN                      |    484 |   9.47 M  |
 | `mtae`                   | Multi-Task AutoEncoder (reconstruction + BP head)  |     37 | 119.5 K   |
 | `mtae_tr`                | MTAE with Transformer encoder/decoder (MAE-style)  |     93 | 109.4 K   |
+| `pulsewoq_resnet1d`      | Overlapping-segment ResNet with explicit quality supervision and output |  38 |  30.1 K   |
 
 > Layers = total named modules (forward hooks); Params = trainable parameters.  
 > Input: PPG segment (1, 1000) — 8 s @ 125 Hz.

@@ -9,11 +9,11 @@ rem
 rem Model names:
 rem   resnet1d  st_resnet  minception  xresnet1d
 rem
-rem Options forwarded to scripts/print_model.py:
+rem Options forwarded to scripts/print-model.py:
 rem   --model <name|all>   Model to display   (default: all)
 rem   --input-length N     PPG segment length  (default: 1000)
 rem   --batch-size N       Dummy batch size    (default: 1)
 rem   --device cpu|cuda    Compute device      (default: cpu)
 
 cd /d "%~dp0.."
-uv run python scripts\print_model.py %*
+uv run python scripts\print-model.py %*

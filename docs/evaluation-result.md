@@ -11,7 +11,7 @@
 모델들의 테스트셋 평가 결과를 종합적으로 정리한다. 모든 모델은 augmentation 미적용
 결과(`evaluation_result_no_aug.md`)와 동일한 테스트셋·평가 방식으로 비교된다.
 
-평가는 `scripts/eval.py`를 사용하며 `best.pt` 체크포인트(validation loss 기준)를
+평가는 `scripts/eval-model.py`를 사용하며 `best.pt` 체크포인트(validation loss 기준)를
 테스트셋에 단 1회 적용하는 방식으로 수행된다.
 
 ## 2. 평가 환경

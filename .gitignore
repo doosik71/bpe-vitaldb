@@ -1,20 +1,20 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
-build/
-dist/
+/build/
+/dist/
 wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+/.venv
 
 # Data files (too large for git)
-data/
+/data/
 *.vital
-*.tmp
-temp/
-temp.md
-images/
-logs/
-models/
+/*.tmp
+/temp/
+/temp.md
+/images/
+/logs/
+/models/
