@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# List directories under data/models/ that contain a trained model (best.pt).
+#
+# Usage:
+#   bin/list-models-dir
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+find data/models -name "best.pt" | sed 's|/best\.pt$||' | sort

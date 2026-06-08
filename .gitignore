@@ -15,3 +15,6 @@ data/
 *.tmp
 temp/
 temp.md
+images/
+logs/
+models/

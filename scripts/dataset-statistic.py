@@ -7,6 +7,7 @@ BP statistics and per-case segment-count distributions, then writes:
   data/dataset/statistic.json          -- numerical summary (JSON)
   data/dataset/bp_distribution.png     -- SBP / DBP density histograms per split
   data/dataset/segments_per_case.png   -- per-case segment-count distribution
+  data/dataset/sd_per_case.png         -- per-case SBP / DBP SD sorted plot
 
 Purpose
 -------
@@ -14,6 +15,9 @@ Purpose
                           across train / val / test
 * segments_per_case.png — spot whether a small number of patients dominates
                           one split (data concentration check)
+* sd_per_case.png       — within-patient SBP/DBP variability; used to assess
+                          whether calibration-based methods truly improve over
+                          simply predicting the patient-level mean
 * statistic.json        — machine-readable numbers for downstream analysis
 
 Usage:
@@ -62,20 +66,28 @@ def load_split(split_dir: Path) -> dict:
     seg_counts: list[int] = []
     sbp_list:   list[np.ndarray] = []
     dbp_list:   list[np.ndarray] = []
+    sbp_sd_per_case: list[float] = []
+    dbp_sd_per_case: list[float] = []
 
     for path in npz_files:
         f = np.load(path)
         y = f["y"]  # (N, 2): [SBP, DBP]
+        sbp = y[:, 0].astype(np.float32)
+        dbp = y[:, 1].astype(np.float32)
         seg_counts.append(len(y))
-        sbp_list.append(y[:, 0])
-        dbp_list.append(y[:, 1])
+        sbp_list.append(sbp)
+        dbp_list.append(dbp)
+        sbp_sd_per_case.append(float(np.std(sbp, ddof=1)) if len(sbp) > 1 else 0.0)
+        dbp_sd_per_case.append(float(np.std(dbp, ddof=1)) if len(dbp) > 1 else 0.0)
 
     return {
-        "n_cases":   len(npz_files),
-        "case_ids":  [p.stem for p in npz_files],
-        "seg_counts": np.array(seg_counts, dtype=np.int64),
-        "sbp": np.concatenate(sbp_list).astype(np.float32),
-        "dbp": np.concatenate(dbp_list).astype(np.float32),
+        "n_cases":        len(npz_files),
+        "case_ids":       [p.stem for p in npz_files],
+        "seg_counts":     np.array(seg_counts, dtype=np.int64),
+        "sbp":            np.concatenate(sbp_list).astype(np.float32),
+        "dbp":            np.concatenate(dbp_list).astype(np.float32),
+        "sbp_sd_per_case": np.array(sbp_sd_per_case, dtype=np.float32),
+        "dbp_sd_per_case": np.array(dbp_sd_per_case, dtype=np.float32),
     }
 
 
@@ -206,6 +218,94 @@ def plot_segments_per_case(raw: dict[str, dict], out_path: Path) -> None:
     plt.close(fig)
 
 
+def plot_sd_per_case(raw: dict[str, dict], out_path: Path) -> None:
+    """Per-case SBP/DBP SD sorted ascending — within-patient variability plot.
+
+    Each dot is one patient (case).  The x-axis is the rank by SD (ascending);
+    the y-axis is the SD in mmHg.  Colours distinguish train / val / test.
+
+    Interpretation: if a patient's within-case SD is small, their mean BP is
+    already a strong predictor.  Calibration methods that learn a per-patient
+    offset therefore improve mainly by approximating that mean rather than by
+    capturing true intra-patient dynamics.
+    """
+    # Flatten all cases across splits, keeping split label
+    all_sbp_sd: list[float] = []
+    all_dbp_sd: list[float] = []
+    all_splits: list[str]   = []
+
+    for split in SPLITS:
+        if split not in raw:
+            continue
+        d = raw[split]
+        for sbp_sd, dbp_sd in zip(d["sbp_sd_per_case"], d["dbp_sd_per_case"]):
+            all_sbp_sd.append(sbp_sd)
+            all_dbp_sd.append(dbp_sd)
+            all_splits.append(split)
+
+    all_sbp_sd = np.array(all_sbp_sd)
+    all_dbp_sd = np.array(all_dbp_sd)
+    all_splits = np.array(all_splits)
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    fig.suptitle(
+        "Within-Patient BP Variability (SD per Case)\n"
+        "— sorted ascending; useful for assessing calibration-method baselines —",
+        fontsize=12,
+    )
+
+    for ax, sd_arr, bp_label in [
+        (axes[0], all_sbp_sd, "SBP"),
+        (axes[1], all_dbp_sd, "DBP"),
+    ]:
+        order  = np.argsort(sd_arr)
+        sorted_sd     = sd_arr[order]
+        sorted_splits = all_splits[order]
+        xs = np.arange(len(sorted_sd))
+
+        # scatter per split
+        for split in SPLITS:
+            mask = np.where(sorted_splits == split)[0]
+            if len(mask) == 0:
+                continue
+            ax.scatter(
+                xs[mask], sorted_sd[mask],
+                c=SPLIT_COLORS[split], s=6, alpha=0.7,
+                label=f"{split} (n={len(mask)})",
+                rasterized=True,
+            )
+
+        median_sd = float(np.median(sorted_sd))
+        mean_sd   = float(np.mean(sorted_sd))
+        ax.axhline(
+            median_sd, color="black", linewidth=1.2, linestyle="--",
+            label=f"Median = {median_sd:.1f} mmHg",
+        )
+        ax.axhline(
+            mean_sd, color="dimgray", linewidth=1.0, linestyle=":",
+            label=f"Mean   = {mean_sd:.1f} mmHg",
+        )
+
+        # annotate pct of cases with SD below a clinically notable threshold
+        threshold = 5.0  # mmHg — rough "easy-to-calibrate" cutoff
+        pct_below = float((sorted_sd < threshold).mean() * 100)
+        ax.axvline(
+            np.searchsorted(sorted_sd, threshold), color="#E91E63",
+            linewidth=1.0, linestyle="-.",
+            label=f"SD < {threshold:.0f} mmHg: {pct_below:.1f}% of cases",
+        )
+
+        ax.set_xlabel("Case rank (sorted by SD, ascending)", fontsize=10)
+        ax.set_ylabel(f"{bp_label} SD (mmHg)", fontsize=10)
+        ax.set_title(f"{bp_label} Within-Case SD", fontsize=11)
+        ax.legend(fontsize=8, loc="upper left")
+        ax.grid(True, alpha=0.3, axis="y")
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -283,6 +383,10 @@ def main() -> None:
     seg_path = dataset_dir / "segments_per_case.png"
     plot_segments_per_case(raw, seg_path)
     print(f"Saved: {seg_path}")
+
+    sd_path = dataset_dir / "sd_per_case.png"
+    plot_sd_per_case(raw, sd_path)
+    print(f"Saved: {sd_path}")
 
 
 if __name__ == "__main__":
