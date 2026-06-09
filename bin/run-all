@@ -1,0 +1,265 @@
+#!/usr/bin/env bash
+# run-all — run the full BPE-VitalDB pipeline end to end.
+#
+# One-time steps (run once regardless of model count):
+#   1  Check CUDA availability              (informational — never aborts the run)
+#   2  Download VitalDB .vital files        (--skip-download to bypass)
+#   3  Build train / val / test NPZ dataset (--skip-build   to bypass)
+#
+# Per-model loop (repeated for every model in the list):
+#   4  Train the model
+#   5  Plot training curves (train-status)  (non-critical)
+#   6  Evaluate model on the test set
+#      (pulsewoq_resnet1d uses eval-model-pulsewoq.py automatically)
+#
+# One-time steps (run once after all models finish):
+#   7  Collect eval results and checkpoints (non-critical)
+#   8  Generate overview parameter/metric graph (non-critical)
+#
+# Usage:
+#   bin/run-all [OPTIONS]
+#
+# Options:
+#   --model MODELS       Comma-separated model list             (default: all)
+#                        e.g. --model resnet1d,st_resnet,minception
+#                        If omitted, all models except pulsewoq_resnet1d are run.
+#   --max-cases N        Limit downloaded cases (blank = all)
+#   --epochs N           Maximum training epochs                 (default: 100)
+#   --batch-size N       Mini-batch size                         (default: 256)
+#   --device DEVICE      Training / inference device             (default: auto)
+#   --seed N             Random seed                             (default: 42)
+#   --data-dir DIR       VitalDB .vital files directory          (default: data/vitaldb)
+#   --dataset-dir DIR    NPZ dataset root directory              (default: data/dataset)
+#   --models-dir DIR     Models root directory                   (default: data/models)
+#   --skip-download      Skip step 2 (download)
+#   --skip-build         Skip step 3 (dataset construction)
+#   -h, --help           Show this help message and exit
+#
+# Examples:
+#   bin/run-all
+#   bin/run-all --model resnet1d
+#   bin/run-all --model resnet1d,st_resnet,minception
+#   bin/run-all --skip-download --skip-build --epochs 200
+#   bin/run-all --model resnet1d --max-cases 500 --device cuda
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+
+# ── All available models (default when --model is omitted) ────────────────────
+# pulsewoq_resnet1d is excluded from default: it uses a separate eval script.
+# Pass --model pulsewoq_resnet1d explicitly to include it.
+ALL_MODELS=(
+    acfa
+    minception
+    mtae
+    mtae_tr
+    resnet1d
+    resnet1d_micro
+    resnet1d_mini
+    resnet1d_tiny
+    st_resnet
+    xresnet1d
+)
+
+# ── Defaults ──────────────────────────────────────────────────────────────────
+MODEL_ARG=""
+MAX_CASES=""
+EPOCHS="100"
+BATCH_SIZE="256"
+DEVICE="auto"
+SEED="42"
+DATA_DIR="data/vitaldb"
+DATASET_DIR="data/dataset"
+MODELS_DIR="data/models"
+SKIP_DOWNLOAD=0
+SKIP_BUILD=0
+
+# ── Argument parsing ──────────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --model)         MODEL_ARG="$2";    shift 2 ;;
+        --max-cases)     MAX_CASES="$2";    shift 2 ;;
+        --epochs)        EPOCHS="$2";       shift 2 ;;
+        --batch-size)    BATCH_SIZE="$2";   shift 2 ;;
+        --device)        DEVICE="$2";       shift 2 ;;
+        --seed)          SEED="$2";         shift 2 ;;
+        --data-dir)      DATA_DIR="$2";     shift 2 ;;
+        --dataset-dir)   DATASET_DIR="$2";  shift 2 ;;
+        --models-dir)    MODELS_DIR="$2";   shift 2 ;;
+        --skip-download) SKIP_DOWNLOAD=1;   shift ;;
+        --skip-build)    SKIP_BUILD=1;      shift ;;
+        -h|--help)
+            awk 'NR==1{next} /^# ──/{exit} /^#/{gsub(/^# ?/,""); print}' "$0"
+            exit 0
+            ;;
+        *)
+            echo "[ERROR] Unknown option: $1" >&2
+            echo "Run 'bin/run-all --help' for usage." >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Build model array from --model arg or use full default list
+if [[ -n "$MODEL_ARG" ]]; then
+    IFS=',' read -ra MODELS <<< "$MODEL_ARG"
+else
+    MODELS=("${ALL_MODELS[@]}")
+fi
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+SEP="================================================================"
+STEP=0
+WARNINGS=()
+MODEL_RESULTS=()   # "model:ok" or "model:fail"
+
+step_header() {
+    STEP=$((STEP + 1))
+    printf '\n%s\n  [%d] %s\n%s\n\n' "$SEP" "$STEP" "$1" "$SEP"
+}
+
+die() {
+    printf '[FAIL] %s\n' "$*" >&2
+    exit 1
+}
+
+soft() {
+    local label="$1"; shift
+    if ! "$@"; then
+        printf '[WARN] "%s" failed — continuing.\n' "$label" >&2
+        WARNINGS+=("$label")
+    fi
+}
+
+# ── Print configuration ───────────────────────────────────────────────────────
+printf '%s\n  BPE-VitalDB  —  Full Pipeline Run\n%s\n' "$SEP" "$SEP"
+printf '  Models      : %s\n'  "${MODELS[*]}"
+printf '  Epochs      : %s\n'  "$EPOCHS"
+printf '  Batch size  : %s\n'  "$BATCH_SIZE"
+printf '  Device      : %s\n'  "$DEVICE"
+printf '  Seed        : %s\n'  "$SEED"
+printf '  Data dir    : %s\n'  "$DATA_DIR"
+printf '  Dataset dir : %s\n'  "$DATASET_DIR"
+printf '  Models dir  : %s\n'  "$MODELS_DIR"
+[[ -n "$MAX_CASES"        ]] && printf '  Max cases   : %s\n' "$MAX_CASES"
+[[ "$SKIP_DOWNLOAD" -eq 1 ]] && printf '  (skip download)\n'
+[[ "$SKIP_BUILD"    -eq 1 ]] && printf '  (skip build)\n'
+printf '\n'
+
+# ────────────────────────────────────────────────────────────────────────────
+#  One-time steps
+# ────────────────────────────────────────────────────────────────────────────
+
+step_header "Check CUDA"
+soft "check-cuda" uv run python scripts/check-cuda.py
+
+step_header "Download VitalDB"
+if [[ "$SKIP_DOWNLOAD" -eq 1 ]]; then
+    echo "  [SKIP] --skip-download specified."
+else
+    DOWNLOAD_ARGS=(--output-dir "$DATA_DIR" --filter-tracks)
+    [[ -n "$MAX_CASES" ]] && DOWNLOAD_ARGS+=(--max-cases "$MAX_CASES")
+    uv run python scripts/download-vitaldb.py "${DOWNLOAD_ARGS[@]}" \
+        || die "download-vitaldb.py failed."
+fi
+
+step_header "Build Dataset"
+if [[ "$SKIP_BUILD" -eq 1 ]]; then
+    echo "  [SKIP] --skip-build specified."
+else
+    uv run python scripts/construct-dataset.py \
+        --data-dir   "$DATA_DIR" \
+        --output-dir "$DATASET_DIR" \
+        || die "construct-dataset.py failed."
+fi
+
+# ────────────────────────────────────────────────────────────────────────────
+#  Per-model loop
+# ────────────────────────────────────────────────────────────────────────────
+
+MODEL_IDX=0
+for MODEL in "${MODELS[@]}"; do
+    MODEL_IDX=$((MODEL_IDX + 1))
+    MODEL_LABEL="($MODEL_IDX/${#MODELS[@]}) $MODEL"
+    RUN_DIR="$MODELS_DIR/$MODEL"
+    MODEL_OK=1
+
+    # ── Train ────────────────────────────────────────────────────────────────
+    step_header "Train: $MODEL_LABEL"
+    if uv run python scripts/train-model.py \
+            --model       "$MODEL" \
+            --dataset-dir "$DATASET_DIR" \
+            --output-dir  "$MODELS_DIR" \
+            --epochs      "$EPOCHS" \
+            --batch-size  "$BATCH_SIZE" \
+            --device      "$DEVICE" \
+            --seed        "$SEED"; then
+        :
+    else
+        printf '[WARN] train-model.py failed for %s — skipping eval.\n' "$MODEL" >&2
+        WARNINGS+=("train:$MODEL")
+        MODEL_RESULTS+=("$MODEL:fail(train)")
+        MODEL_OK=0
+    fi
+
+    if [[ "$MODEL_OK" -eq 0 ]]; then continue; fi
+
+    # ── Training status ──────────────────────────────────────────────────────
+    step_header "Training Status: $MODEL_LABEL"
+    soft "train-status:$MODEL" uv run python scripts/train-status.py "$RUN_DIR"
+
+    # ── Evaluate ─────────────────────────────────────────────────────────────
+    step_header "Evaluate: $MODEL_LABEL"
+    if [[ "$MODEL" == "pulsewoq_resnet1d" ]]; then
+        EVAL_SCRIPT="scripts/eval-model-pulsewoq.py"
+    else
+        EVAL_SCRIPT="scripts/eval-model.py"
+    fi
+
+    if uv run python "$EVAL_SCRIPT" \
+            "$RUN_DIR" \
+            --dataset-dir "$DATASET_DIR" \
+            --device      "$DEVICE"; then
+        MODEL_RESULTS+=("$MODEL:ok")
+    else
+        printf '[WARN] eval failed for %s.\n' "$MODEL" >&2
+        WARNINGS+=("eval:$MODEL")
+        MODEL_RESULTS+=("$MODEL:fail(eval)")
+    fi
+done
+
+# ────────────────────────────────────────────────────────────────────────────
+#  One-time post-loop steps
+# ────────────────────────────────────────────────────────────────────────────
+
+step_header "Collect Results"
+soft "collect-result" uv run python scripts/collect-result.py \
+    --models-dir "$MODELS_DIR"
+
+step_header "Overview Graph"
+soft "generate-overview-graph" uv run python scripts/generate-overview-graph.py \
+    --models-dir "$MODELS_DIR"
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+printf '\n%s\n  Pipeline complete.\n\n' "$SEP"
+
+printf '  Model results:\n'
+for r in "${MODEL_RESULTS[@]}"; do
+    model="${r%%:*}"
+    status="${r#*:}"
+    if [[ "$status" == "ok" ]]; then
+        printf '    %-24s  [OK]\n' "$model"
+    else
+        printf '    %-24s  [%s]\n' "$model" "$status"
+    fi
+done
+
+if [[ ${#WARNINGS[@]} -gt 0 ]]; then
+    printf '\n  Warnings:\n'
+    for w in "${WARNINGS[@]}"; do
+        printf '    - %s\n' "$w"
+    done
+fi
+
+printf '%s\n' "$SEP"

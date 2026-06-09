@@ -297,6 +297,7 @@ Available model architectures:
 | `mtae_tr`           | MTAE with Transformer encoder/decoder (MAE-style)                       |     93 | 109.4 K |
 | `pulsewoq_resnet1d` | Overlapping-segment ResNet with explicit quality supervision and output |     38 |  30.1 K |
 | `acfa`              | ACFA: DyCASNet + xLSTM + Transformer + FKAN (Li et al., 2026)           |    108 | 542.6 K |
+| `ae_lstm`           | Autoencoder-LSTM: encoder/decoder + BP head (Vanithamani et al., 2025)  |      7 |  50.6 K |
 | `cnn_bilstm_at`     | CNN–BiLSTM with additive attention (Mohammadi et al., 2025)             |     17 | 691.3 K |
 
 > Layers = total named modules (forward hooks); Params = trainable parameters.  

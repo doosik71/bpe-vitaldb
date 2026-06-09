@@ -5,18 +5,23 @@ For each metric (MAE, ME, SD, RMSE), produces one PNG with two subplots:
   Left:  SBP (systolic blood pressure)
   Right: DBP (diastolic blood pressure)
 
+Also produces a single inference-time graph:
+  x-axis: trainable parameter count (log scale)
+  y-axis: average inference time per sample (ms/sample)
+
 x-axis: trainable parameter count (log scale)
 y-axis: metric value (mmHg)
 
 Data sources:
   data/models/<model>/struct.txt           — trainable parameter count
-  data/models/<model>/eval_results.json    — metric values
+  data/models/<model>/eval_results.json    — metric values + inference time
 
 Output:
   images/mae.png
   images/me.png
   images/sd.png
   images/rmse.png
+  images/inference_time.png
 
 Usage:
     uv run python scripts/generate-overview-graph.py
@@ -103,10 +108,11 @@ def load_model_data(models_dir: Path) -> list[dict]:
             eval_data = json.load(f)
 
         records.append({
-            "model":    model_dir.name,
-            "n_params": n_params,
-            "sbp":      eval_data["sbp"],
-            "dbp":      eval_data["dbp"],
+            "model":             model_dir.name,
+            "n_params":          n_params,
+            "sbp":               eval_data["sbp"],
+            "dbp":               eval_data["dbp"],
+            "avg_ms_per_sample": eval_data.get("avg_ms_per_sample"),
         })
 
     return records
@@ -180,6 +186,41 @@ def plot_metric(
     print(f"  Saved: {out_path}")
 
 
+def plot_inference_time(data: list[dict], output_dir: Path) -> None:
+    """Plot trainable parameter count (x) vs inference time per sample (y)."""
+    timed = [r for r in data if r["avg_ms_per_sample"] is not None]
+    if not timed:
+        print("  [warn] no inference time data — skipping inference_time.png")
+        return
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    for i, rec in enumerate(timed):
+        x = rec["n_params"]
+        y = rec["avg_ms_per_sample"]
+        color = _PALETTE[i % len(_PALETTE)]
+        ax.scatter(x, y, s=70, color=color, zorder=5, label=rec["model"])
+        _annotate(ax, x, y, rec["model"])
+
+    ax.set_xscale("log")
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(_param_formatter))
+    ax.xaxis.set_minor_formatter(ticker.NullFormatter())
+
+    ax.set_xlabel("Trainable Parameters (log scale)", fontsize=10)
+    ax.set_ylabel("Inference Time (ms / sample)", fontsize=10)
+    ax.set_title("Model Comparison: Inference Time vs Parameter Count", fontsize=11)
+    ax.grid(True, which="major", linestyle="--", alpha=0.4)
+    ax.grid(True, which="minor", linestyle=":",  alpha=0.2)
+    ax.legend(loc="upper left", fontsize=8, framealpha=0.7)
+
+    fig.tight_layout()
+
+    out_path = output_dir / "inference_time.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved: {out_path}")
+
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -195,6 +236,8 @@ def main() -> None:
 
     for metric, ylabel, zero_line in METRICS:
         plot_metric(data, metric, ylabel, zero_line, args.output_dir)
+
+    plot_inference_time(data, args.output_dir)
 
     print("Done.")
 
