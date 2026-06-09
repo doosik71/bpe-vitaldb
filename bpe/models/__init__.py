@@ -1,5 +1,6 @@
 """Model registry and direct SBP/DBP regression architectures."""
 
+from bpe.models.acfa import ACFA
 from bpe.models.minception import MInception
 from bpe.models.mtae import MTAE
 from bpe.models.mtae_tr import MTAE_TR
@@ -22,6 +23,7 @@ from bpe.models.st_resnet import SpectroTemporalResNet
 from bpe.models.xresnet1d import XResNet1D101
 
 __all__ = [
+    "ACFA",
     "MInception",
     "MTAE",
     "MTAE_TR",
