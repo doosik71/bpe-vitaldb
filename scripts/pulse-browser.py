@@ -100,6 +100,13 @@ def find_best_pt(models_dir: Path) -> Path | None:
     model_dir = models_dir / MODEL_NAME
     if not model_dir.exists():
         return None
+
+    # Check for best.pt directly in model_dir
+    pt = model_dir / "best.pt"
+    if pt.exists():
+        return pt
+
+    # Check for best.pt in run subdirectories
     run_dirs = sorted(d for d in model_dir.iterdir() if d.is_dir())
     for run_dir in reversed(run_dirs):
         pt = run_dir / "best.pt"
