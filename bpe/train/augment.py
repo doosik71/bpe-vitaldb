@@ -33,11 +33,11 @@ class AmplitudeScaling:
     gain variations (e.g. PPG contact quality differences).
 
     Args:
-        lo: Lower bound of the scale factor (default 0.9).
-        hi: Upper bound of the scale factor (default 1.1).
+        lo: Lower bound of the scale factor (default 0.8).
+        hi: Upper bound of the scale factor (default 1.2).
     """
 
-    def __init__(self, lo: float = 0.9, hi: float = 1.1) -> None:
+    def __init__(self, lo: float = 0.8, hi: float = 1.2) -> None:
         self.lo = lo
         self.hi = hi
 
@@ -54,11 +54,11 @@ class TimeShift:
     at every call.
 
     Args:
-        max_shift: Maximum absolute shift in samples (default 25, i.e. 0.2 s
+        max_shift: Maximum absolute shift in samples (default 50, i.e. 0.4 s
                    at 125 Hz).
     """
 
-    def __init__(self, max_shift: int = 25) -> None:
+    def __init__(self, max_shift: int = 50) -> None:
         self.max_shift = max_shift
 
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
@@ -67,11 +67,12 @@ class TimeShift:
 
 
 class RandomMasking:
-    """Zero-out a random fraction of samples (scatter masking).
+    """Zero-out one random contiguous span of samples.
 
-    Mask positions are sampled without replacement from the segment.  Masked
-    values are set to 0.0, which equals the mean of a z-score normalised
-    signal.  The masking fraction is drawn uniformly from [lo_frac, hi_frac].
+    A masking fraction is drawn uniformly from [lo_frac, hi_frac] to decide
+    the target span length, then clipped to at most 125 samples (1.0 s at
+    125 Hz).  The masked values are set to 0.0, which equals the mean of a
+    z-score normalised signal.
 
     Args:
         lo_frac: Minimum fraction of samples to mask (default 0.05).
@@ -85,10 +86,10 @@ class RandomMasking:
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         n = x.size(0)
         frac = torch.empty(1).uniform_(self.lo_frac, self.hi_frac).item()
-        n_mask = max(1, int(n * frac))
-        indices = torch.randperm(n)[:n_mask]
+        n_mask = min(max(1, int(n * frac)), min(n, 125))
+        start = int(torch.randint(0, n - n_mask + 1, (1,)))
         x = x.clone()
-        x[indices] = 0.0
+        x[start:start + n_mask] = 0.0
         return x
 
 

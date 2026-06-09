@@ -26,9 +26,9 @@ Options:
 
 Augmentation (all enabled by default; use --no-* to disable):
     --no-aug-noise       Disable Gaussian noise (std=0.01)
-    --no-aug-scale       Disable amplitude scaling (×0.9~1.1)
-    --no-aug-shift       Disable circular time shift (±25 samples)
-    --no-aug-mask        Disable random masking (5~10% of samples)
+    --no-aug-scale       Disable amplitude scaling (×0.8~1.2)
+    --no-aug-shift       Disable circular time shift (±50 samples)
+    --no-aug-mask        Disable random span masking (5~10% contiguous span, <=1 s)
 
 Patient balancing (enabled by default):
     --no-patient-balance Disable per-patient WeightedRandomSampler.
@@ -140,15 +140,15 @@ def parse_args() -> argparse.Namespace:
     )
     aug.add_argument(
         "--no-aug-scale", dest="aug_scale", action="store_false", default=True,
-        help="Disable amplitude scaling augmentation (×0.9~1.1)",
+        help="Disable amplitude scaling augmentation (×0.8~1.2)",
     )
     aug.add_argument(
         "--no-aug-shift", dest="aug_shift", action="store_false", default=True,
-        help="Disable circular time-shift augmentation (±25 samples)",
+        help="Disable circular time-shift augmentation (±50 samples)",
     )
     aug.add_argument(
         "--no-aug-mask", dest="aug_mask", action="store_false", default=True,
-        help="Disable random masking augmentation (5~10%% of samples)",
+        help="Disable random span masking augmentation (5~10%% contiguous span, <=1 s)",
     )
 
     # ── Patient balancing ─────────────────────────────────────────────────────
@@ -228,9 +228,9 @@ def main() -> None:
     if args.aug_noise:
         aug_transforms.append(GaussianNoise(std=0.01))
     if args.aug_scale:
-        aug_transforms.append(AmplitudeScaling(lo=0.9, hi=1.1))
+        aug_transforms.append(AmplitudeScaling(lo=0.8, hi=1.2))
     if args.aug_shift:
-        aug_transforms.append(TimeShift(max_shift=25))
+        aug_transforms.append(TimeShift(max_shift=50))
     if args.aug_mask:
         aug_transforms.append(RandomMasking(lo_frac=0.05, hi_frac=0.10))
     augment = PPGAugment(aug_transforms) if aug_transforms else None

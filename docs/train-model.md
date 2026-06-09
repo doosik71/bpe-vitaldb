@@ -100,12 +100,12 @@ uv run python scripts/train-model.py --model xresnet1d --device cuda:0
 
 ### 데이터 증강 (기본값: 전체 활성화)
 
-| 옵션             | 설명                                 |
-| ---------------- | ------------------------------------ |
-| `--no-aug-noise` | Gaussian noise 비활성화 (std=0.01)   |
-| `--no-aug-scale` | 진폭 스케일링 비활성화 (×0.9~1.1)    |
-| `--no-aug-shift` | 원형 시간축 이동 비활성화 (±25 샘플) |
-| `--no-aug-mask`  | 랜덤 마스킹 비활성화 (5~10% 샘플)    |
+| 옵션             | 설명                                                  |
+| ---------------- | ----------------------------------------------------- |
+| `--no-aug-noise` | Gaussian noise 비활성화 (std=0.01)                    |
+| `--no-aug-scale` | 진폭 스케일링 비활성화 (×0.8~1.2)                     |
+| `--no-aug-shift` | 원형 시간축 이동 비활성화 (±50 샘플)                  |
+| `--no-aug-mask`  | 랜덤 span 마스킹 비활성화 (5~10% 연속 구간, 최대 1초) |
 
 ### 환자 균형 샘플링 (기본값: 활성화)
 
@@ -179,12 +179,12 @@ def set_seed(seed: int) -> None:
 
 네 가지 증강이 기본적으로 모두 활성화된다. `--no-aug-*` 플래그로 각각 비활성화할 수 있다.
 
-| 증강              | 클래스                                      | 동작                                         |
-| ----------------- | ------------------------------------------- | -------------------------------------------- |
-| Gaussian noise    | `GaussianNoise(std=0.01)`                   | PPG 전 샘플에 N(0, 0.01) 잡음 추가           |
-| Amplitude scaling | `AmplitudeScaling(lo=0.9, hi=1.1)`          | 신호 전체를 [0.9, 1.1] 범위의 배율로 곱함    |
-| Time shift        | `TimeShift(max_shift=25)`                   | 최대 ±25 샘플 원형 이동 (끝이 처음으로 연결) |
-| Random masking    | `RandomMasking(lo_frac=0.05, hi_frac=0.10)` | 무작위 위치의 5~10% 샘플을 0으로 마스킹      |
+| 증강              | 클래스                                      | 동작                                                  |
+| ----------------- | ------------------------------------------- | ----------------------------------------------------- |
+| Gaussian noise    | `GaussianNoise(std=0.01)`                   | PPG 전 샘플에 N(0, 0.01) 잡음 추가                    |
+| Amplitude scaling | `AmplitudeScaling(lo=0.8, hi=1.2)`          | 신호 전체를 [0.8, 1.2] 범위의 배율로 곱함             |
+| Time shift        | `TimeShift(max_shift=50)`                   | 최대 ±50 샘플 원형 이동 (끝이 처음으로 연결)          |
+| Random masking    | `RandomMasking(lo_frac=0.05, hi_frac=0.10)` | 길이 5~10%의 연속 span 하나를 0으로 마스킹 (최대 1초) |
 
 활성화된 증강은 `PPGAugment` 래퍼로 합성되어 `PPGDataset`의 `transform`으로 전달된다.
 증강은 **훈련 세트에만** 적용되며 검증 세트에는 적용되지 않는다.
