@@ -39,11 +39,15 @@ Options:
     --segment-sec   Window length in seconds      (default: 8)
     --guard-sec     Guard-band duration in sec    (default: 1)
     --no-guard      Disable guard-band filtering
+    --nproc         Worker process count          (default: os.cpu_count())
+    --no-resume     Reprocess cases even if NPZ already exists
     --seed          Shuffle seed                  (default: 42)
 """
 
 import argparse
 import logging
+import multiprocessing as mp
+import os
 import random
 from pathlib import Path
 
@@ -96,6 +100,10 @@ def parse_args() -> argparse.Namespace:
                    help="Guard-band duration added on each side before filtering (default: 1)")
     p.add_argument("--no-guard",    action="store_true",
                    help="Disable guard-band: filter each window segment directly")
+    p.add_argument("--nproc",       type=int,   default=None,
+                   help="Worker process count (default: os.cpu_count())")
+    p.add_argument("--no-resume",   action="store_true",
+                   help="Reprocess cases even if the output NPZ already exists")
     p.add_argument("--seed",        type=int,   default=42,
                    help="Random seed for case shuffling (default: 42)")
     return p.parse_args()
@@ -214,6 +222,45 @@ def process_case(
     )
 
 
+def _process_chunk(args: tuple) -> tuple[dict[str, int], dict[str, int]]:
+    """Worker: process a list of (path, out_dir, split_name) tasks and save NPZ files."""
+    worker_id, tasks, target_hz, segment_sec, guard_sec = args
+
+    pbar = tqdm(
+        total=len(tasks),
+        position=worker_id,
+        desc=f"  proc {worker_id:2d}",
+        unit="case",
+        ascii=" -+=",
+        leave=True,
+        dynamic_ncols=True,
+    )
+
+    seg_counts:  dict[str, int] = {}
+    skip_counts: dict[str, int] = {}
+
+    for path, out_dir, split_name in tasks:
+        result = process_case(
+            path,
+            target_hz=target_hz,
+            segment_sec=segment_sec,
+            guard_sec=guard_sec,
+        )
+        if result is None:
+            skip_counts[split_name] = skip_counts.get(split_name, 0) + 1
+        else:
+            x, y = result
+            out_path = out_dir / f"{path.stem}.npz"
+            tmp_path = out_dir / f".{path.stem}.tmp.npz"
+            np.savez_compressed(tmp_path, x=x, y=y)
+            tmp_path.rename(out_path)  # atomic on POSIX — no partial file on crash
+            seg_counts[split_name] = seg_counts.get(split_name, 0) + len(x)
+        pbar.update(1)
+
+    pbar.close()
+    return seg_counts, skip_counts
+
+
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
@@ -238,12 +285,16 @@ def main() -> None:
         return
 
     guard_sec = 0 if args.no_guard else args.guard_sec
+    nproc     = args.nproc if args.nproc is not None else (os.cpu_count() or 1)
+    resume    = not args.no_resume
 
     log.info("Found %d .vital files in %s", len(vital_files), args.data_dir)
     log.info(
-        "Settings: target_hz=%d  segment_sec=%ds  overlap=%ds  guard=%s  split=%.0f/%.0f/%.0f",
+        "Settings: target_hz=%d  segment_sec=%ds  overlap=%ds  guard=%s  nproc=%d  resume=%s  split=%.0f/%.0f/%.0f",
         args.target_hz, args.segment_sec, args.segment_sec // 2,
         "disabled" if guard_sec == 0 else f"{guard_sec}s",
+        nproc,
+        "on" if resume else "off",
         args.split[0] * 100, args.split[1] * 100, args.split[2] * 100,
     )
 
@@ -264,35 +315,67 @@ def main() -> None:
     for name, files in splits.items():
         log.info("  %-5s : %d cases", name, len(files))
 
-    # ── process each split ───────────────────────────────────────────────────
-    seg_counts: dict[str, int] = {}
+    # ── create output directories ─────────────────────────────────────────────
+    for split_name in splits:
+        (args.output_dir / split_name).mkdir(parents=True, exist_ok=True)
+
+    # ── build flat task list (all splits combined) ────────────────────────────
+    all_tasks: list[tuple[Path, Path, str]] = [
+        (path, args.output_dir / split_name, split_name)
+        for split_name, files in splits.items()
+        for path in files
+    ]
+
+    # ── pre-filter resumed cases in the main process ──────────────────────────
+    # Doing this here (not in workers) avoids mp.RLock acquisition per case,
+    # which is orders of magnitude slower than a simple filesystem exists() check.
+    resume_counts: dict[str, int] = {name: 0 for name in splits}
+    if resume:
+        pending: list[tuple[Path, Path, str]] = []
+        for path, out_dir, split_name in all_tasks:
+            out_file = out_dir / f"{path.stem}.npz"
+            if out_file.exists() and out_file.stat().st_size > 0:
+                resume_counts[split_name] += 1
+            else:
+                pending.append((path, out_dir, split_name))
+        all_tasks = pending
+
+    # ── divide tasks into per-worker chunks ───────────────────────────────────
+    seg_counts:  dict[str, int] = {name: 0 for name in splits}
+    skip_counts: dict[str, int] = {name: 0 for name in splits}
+
+    if all_tasks:
+        n_workers   = min(nproc, len(all_tasks))
+        chunks      = [all_tasks[i::n_workers] for i in range(n_workers)]
+        worker_args = [
+            (i, chunk, args.target_hz, args.segment_sec, guard_sec)
+            for i, chunk in enumerate(chunks)
+        ]
+
+        # ── run workers with per-worker progress bars ─────────────────────────
+        tqdm.set_lock(mp.RLock())
+        with mp.Pool(
+            processes=n_workers,
+            initializer=tqdm.set_lock,
+            initargs=(tqdm.get_lock(),),
+        ) as pool:
+            results = pool.map(_process_chunk, worker_args)
+
+        print()  # move cursor below progress bars
+
+        for worker_seg, worker_skip in results:
+            for split, n in worker_seg.items():
+                seg_counts[split] += n
+            for split, n in worker_skip.items():
+                skip_counts[split] += n
 
     for split_name, files in splits.items():
-        out_dir = args.output_dir / split_name
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        skipped   = 0
-        n_segs    = 0
-
-        for path in tqdm(files, desc=f"{split_name:5s}", unit="case"):
-            result = process_case(
-                path,
-                target_hz=args.target_hz,
-                segment_sec=args.segment_sec,
-                guard_sec=guard_sec,
-            )
-            if result is None:
-                skipped += 1
-                continue
-
-            x, y = result
-            np.savez_compressed(out_dir / f"{path.stem}.npz", x=x, y=y)
-            n_segs += len(x)
-
-        seg_counts[split_name] = n_segs
+        n_segs    = seg_counts[split_name]
+        n_skipped = skip_counts[split_name]
+        n_resumed = resume_counts[split_name]
         log.info(
-            "  %-5s done — %d segments from %d cases (%d skipped)",
-            split_name, n_segs, len(files) - skipped, skipped,
+            "  %-5s done — %d segments from %d new cases (%d resumed, %d skipped)",
+            split_name, n_segs, len(files) - n_skipped - n_resumed, n_resumed, n_skipped,
         )
 
     # ── summary ──────────────────────────────────────────────────────────────
