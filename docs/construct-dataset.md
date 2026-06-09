@@ -88,6 +88,7 @@ uv run python scripts/construct-dataset.py \
   --split 0.7 0.1 0.2 \
   --target-hz 125 \
   --segment-sec 8 \
+  --guard-sec 1 \
   --seed 42
 ```
 
@@ -110,6 +111,12 @@ uv run python scripts/construct-dataset.py \
 - `--segment-sec`
   - 세그먼트 길이(초)
   - 기본값: `8`
+- `--guard-sec`
+  - guard-band 길이(초); 필터링 시 윈도우 양쪽에 추가하는 구간
+  - 기본값: `1`
+  - `--no-guard`가 지정되면 무시된다.
+- `--no-guard`
+  - guard-band를 사용하지 않고 윈도우 구간만 필터링한다.
 - `--seed`
   - 케이스 shuffle용 난수 시드
   - 기본값: `42`
@@ -193,7 +200,7 @@ n_test  = 나머지 전부
 
 #### 4.4.2 4차 버터워스 대역통과 필터
 
-Decimation 직후 `_bandpass_filter(ppg, target_hz)`를 적용한다.
+필터는 **윈도우 단위**로 적용한다. (전체 신호에 미리 적용하지 않는다.)
 
 - 통과 대역: **0.5 Hz ~ 10 Hz**
 - 필터 차수: **4차 버터워스 (Butterworth)**
@@ -202,15 +209,35 @@ Decimation 직후 `_bandpass_filter(ppg, target_hz)`를 적용한다.
 
 선택 이유:
 
-| 주파수 대역 | 역할 |
-| --- | --- |
-| 0.5 Hz 이하 제거 (고역통과) | 호흡, 체동에 의한 느린 기저선 변동(baseline wander) 제거 |
-| 10 Hz 이상 제거 (저역통과) | 전기적 잡음, 고주파 간섭 제거; PPG 주요 성분(~5 Hz)은 보존 |
+| 주파수 대역                 | 역할                                                       |
+| --------------------------- | ---------------------------------------------------------- |
+| 0.5 Hz 이하 제거 (고역통과) | 호흡, 체동에 의한 느린 기저선 변동(baseline wander) 제거   |
+| 10 Hz 이상 제거 (저역통과)  | 전기적 잡음, 고주파 간섭 제거; PPG 주요 성분(~5 Hz)은 보존 |
 
 `sosfiltfilt`는 forward-backward 필터링으로 위상 왜곡 없이 반환한다.
-필터 계수는 케이스마다 재계산하지 않고 `butter()`로 호출 시 계산된다.
-신호 길이가 충분히 짧은 케이스(`total_sec < segment_sec`)는 이미 버려지므로
-edge effect 문제는 실질적으로 발생하지 않는다.
+
+**윈도우 단위 적용 이유:**  
+VitalDB raw PPG 트랙에는 센서 미연결 구간 등에 NaN 값이 존재한다.
+`sosfiltfilt`는 IIR 필터이므로 입력에 NaN이 하나라도 있으면 출력 전체가 NaN이 된다.
+전체 신호에 먼저 적용하면 모든 케이스가 skip되는 버그로 이어진다.
+따라서 NaN 체크를 먼저 통과한 유효한 윈도우에만 필터를 적용한다.
+
+**Guard-band 기법 (기본값, `--no-guard` 미지정 시):**  
+0.5 Hz 고역통과 필터의 settling time은 약 1~2초다.
+`sosfiltfilt`의 내부 패딩(~27 samples, 0.2초)만으로는 충분하지 않아
+윈도우 양 끝에 edge artifact가 발생할 수 있다.
+
+이를 완화하기 위해 필터링 구간을 윈도우 양쪽으로 `guard_sec`초 확장한 뒤,
+필터링 후 guard 구간을 제거하여 정상 상태(steady-state) 응답만 취한다.
+
+```text
+[─ guard_sec ─][──── segment_sec ────][─ guard_sec ─]
+←         이 전체 구간으로 sosfiltfilt 적용         →
+               └── 이 구간만 저장 ───┘
+```
+
+guard 구간 샘플에 NaN이 있으면 해당 윈도우는 skip한다.
+신호 시작/끝 부분에서 guard 구간이 배열 범위를 벗어나는 경우도 skip한다.
 
 ### 4.5 시간 길이 정렬
 

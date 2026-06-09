@@ -37,6 +37,8 @@ Options:
     --split         Train val test ratios         (default: 0.7 0.1 0.2)
     --target-hz     Output PPG sample rate (Hz)   (default: 125)
     --segment-sec   Window length in seconds      (default: 8)
+    --guard-sec     Guard-band duration in sec    (default: 1)
+    --no-guard      Disable guard-band filtering
     --seed          Shuffle seed                  (default: 42)
 """
 
@@ -90,6 +92,10 @@ def parse_args() -> argparse.Namespace:
                    help="Target PPG sample rate in Hz (default: 125)")
     p.add_argument("--segment-sec", type=int,   default=8,
                    help="Segment / window duration in seconds (default: 8)")
+    p.add_argument("--guard-sec",   type=int,   default=1,
+                   help="Guard-band duration added on each side before filtering (default: 1)")
+    p.add_argument("--no-guard",    action="store_true",
+                   help="Disable guard-band: filter each window segment directly")
     p.add_argument("--seed",        type=int,   default=42,
                    help="Random seed for case shuffling (default: 42)")
     return p.parse_args()
@@ -108,6 +114,7 @@ def process_case(
     *,
     target_hz: int,
     segment_sec: int,
+    guard_sec: int,
 ) -> tuple[np.ndarray, np.ndarray] | None:
     """
     Extract all valid (x, y) pairs from a single .vital file.
@@ -123,6 +130,7 @@ def process_case(
     segment_samples = segment_sec * target_hz       # samples per window at target_hz
     stride_samples  = (segment_sec // 2) * target_hz  # 50 % overlap
     stride_sec      = segment_sec // 2              # stride in seconds (for 1-Hz arrays)
+    guard_samples   = guard_sec * target_hz         # guard-band length (0 = disabled)
 
     # ── open file ────────────────────────────────────────────────────────────
     try:
@@ -148,9 +156,10 @@ def process_case(
         log.warning("%s: track read error — %s", path.stem, exc)
         return None
 
-    # ── decimate PPG then bandpass-filter ────────────────────────────────────
-    ppg = ppg_raw[::factor]                   # shape: (T * target_hz / SOURCE_HZ,)
-    ppg = _bandpass_filter(ppg, target_hz)    # 4th-order Butterworth 0.5–10 Hz
+    # ── decimate PPG ─────────────────────────────────────────────────────────
+    # Bandpass filter is applied per-window (after NaN check) because
+    # sosfiltfilt propagates NaN from any single bad sample to the entire signal.
+    ppg = ppg_raw[::factor]   # shape: (T * target_hz / SOURCE_HZ,)
 
     # ── compute window count ─────────────────────────────────────────────────
     total_sec = min(len(ppg) / target_hz, len(sbp_1hz), len(dbp_1hz))
@@ -171,9 +180,19 @@ def process_case(
         if pe > len(ppg) or be > len(sbp_1hz) or be > len(dbp_1hz):
             break
 
-        ppg_seg = ppg[ps:pe]
-        if not np.all(np.isfinite(ppg_seg)):
+        # Guard-band: extend the filter region by guard_samples on each side.
+        # When guard_sec=0 (--no-guard), fs=ps and fe=pe — identical to no-guard.
+        fs = ps - guard_samples
+        fe = pe + guard_samples
+        if fs < 0 or fe > len(ppg):
+            continue  # guard region out of bounds; skip (first/last few windows)
+
+        filter_region = ppg[fs:fe]
+        if not np.all(np.isfinite(filter_region)):
             continue
+
+        filtered = _bandpass_filter(filter_region, target_hz)
+        ppg_seg = filtered[guard_samples : guard_samples + segment_samples]
 
         sbp_val = _bp_label(sbp_1hz[bs:be], SBP_RANGE)
         dbp_val = _bp_label(dbp_1hz[bs:be], DBP_RANGE)
@@ -218,10 +237,13 @@ def main() -> None:
         log.error("No .vital files found in %s", args.data_dir)
         return
 
+    guard_sec = 0 if args.no_guard else args.guard_sec
+
     log.info("Found %d .vital files in %s", len(vital_files), args.data_dir)
     log.info(
-        "Settings: target_hz=%d  segment_sec=%ds  overlap=%ds  split=%.0f/%.0f/%.0f",
+        "Settings: target_hz=%d  segment_sec=%ds  overlap=%ds  guard=%s  split=%.0f/%.0f/%.0f",
         args.target_hz, args.segment_sec, args.segment_sec // 2,
+        "disabled" if guard_sec == 0 else f"{guard_sec}s",
         args.split[0] * 100, args.split[1] * 100, args.split[2] * 100,
     )
 
@@ -257,6 +279,7 @@ def main() -> None:
                 path,
                 target_hz=args.target_hz,
                 segment_sec=args.segment_sec,
+                guard_sec=guard_sec,
             )
             if result is None:
                 skipped += 1
