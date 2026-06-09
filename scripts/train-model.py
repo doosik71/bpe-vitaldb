@@ -4,7 +4,7 @@ Train a direct-regression BP model on the VitalDB NPZ dataset.
 Saves checkpoints and a metrics CSV under data/models/<model>/.
 
 Usage:
-    uv run python scripts/train.py --model resnet1d [OPTIONS]
+    uv run python scripts/train-model.py --model resnet1d [OPTIONS]
 
 Options:
     --model              Model name from the registry (required)

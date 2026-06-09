@@ -17,8 +17,8 @@
 #   bin/train-model --model xresnet1d --batch-size 128 --workers 2
 #   bin/train-model --model resnet1d --resume data/models/resnet1d/last.pt
 #
-# All options are forwarded to scripts/train.py.
+# All options are forwarded to scripts/train-model.py.
 # Run "bin/train-model --help" for a full option listing.
 
 cd "$(dirname "$0")/.."
-uv run python scripts/train.py "$@"
+uv run python scripts/train-model.py "$@"

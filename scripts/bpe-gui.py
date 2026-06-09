@@ -43,6 +43,9 @@ except Exception:
         "pulsewoq_resnet1d", "acfa",
     ])
 
+# Models for bpe-browser: all models except pulsewoq_resnet1d (has dedicated browser)
+MODELS_BPE: list[str] = [m for m in MODELS if m != "pulsewoq_resnet1d"]
+
 
 def get_device_choices() -> list[str]:
     """Get available device options based on CUDA availability."""
@@ -119,7 +122,7 @@ PIPELINE = [
         "params": [
             ("data-dir",     "dir",   "data/vitaldb", "Source directory of .vital files"),
             ("output-dir",   "dir",   "data/dataset", "Root output directory"),
-            ("split",        "entry", "0.6 0.2 0.2",  "Train / val / test ratios (3 space-separated numbers)"),
+            ("split",        "entry", "0.7 0.1 0.2",  "Train / val / test ratios (3 space-separated numbers)"),
             ("target-hz",    "int",   "125",           "Target PPG sample rate (Hz)"),
             ("segment-sec",  "int",   "8",             "Window duration in seconds"),
             ("seed",         "int",   "42",            "Random seed for case shuffling"),
@@ -179,7 +182,7 @@ PIPELINE = [
         "id": "train",
         "label": "Train Model",
         "category": "Training",
-        "script": "train.py",
+        "script": "train-model.py",
         "desc": "Train a deep learning model for BP estimation from PPG waveforms.",
         "gui": False,
         "params": [
@@ -262,6 +265,23 @@ PIPELINE = [
         "params": [
             ("dataset-dir", "dir",        "data/dataset", "Root dataset directory"),
             ("models-dir",  "dir",        "data/models",  "Root models directory"),
+            ("device",      "combo_free", "",             "Inference device (blank = auto-detect)",
+             get_device_choices_with_blank()),
+            ("target-hz",   "int",        "125",          "PPG sample rate (Hz)"),
+        ],
+    },
+    {
+        "id": "bpe_browse",
+        "label": "Browse BPE Results",
+        "category": "Evaluation",
+        "script": "bpe-browser.py",
+        "desc": "Interactive GUI browser for PPG segments with BPE model predictions (all models except pulsewoq_resnet1d).",
+        "gui": True,
+        "params": [
+            ("dataset-dir", "dir",        "data/dataset", "Root dataset directory"),
+            ("models-dir",  "dir",        "data/models",  "Root models directory"),
+            ("model",       "combo_free", "",             "Model to pre-select on startup (blank = first available)",
+             MODELS_BPE),
             ("device",      "combo_free", "",             "Inference device (blank = auto-detect)",
              get_device_choices_with_blank()),
             ("target-hz",   "int",        "125",          "PPG sample rate (Hz)"),

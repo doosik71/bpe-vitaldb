@@ -22,6 +22,7 @@ Options:
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 import matplotlib
@@ -178,21 +179,26 @@ def run_inference(
     model: torch.nn.Module,
     loader: DataLoader,
     device: torch.device,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Return (predictions, targets) as float32 numpy arrays of shape (N, 2)."""
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Return (predictions, targets, elapsed_sec) where elapsed_sec is pure inference wall time."""
     model.eval()
     preds_list, targets_list = [], []
 
+    elapsed = 0.0
     with torch.no_grad():
         for x, y in loader:
             x = x.to(device)
+            t0 = time.perf_counter()
             pred = model(x)
+            if device.type == "cuda":
+                torch.cuda.synchronize()
+            elapsed += time.perf_counter() - t0
             preds_list.append(pred.cpu().numpy())
             targets_list.append(y.numpy())
 
     preds   = np.concatenate(preds_list,   axis=0)
     targets = np.concatenate(targets_list, axis=0)
-    return preds.astype(np.float32), targets.astype(np.float32)
+    return preds.astype(np.float32), targets.astype(np.float32), elapsed
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -255,7 +261,7 @@ def main() -> None:
 
     # ── Inference ─────────────────────────────────────────────────────────────
     print("Running inference …")
-    preds, targets = run_inference(model, loader, device)
+    preds, targets, inference_sec = run_inference(model, loader, device)
 
     pred_sbp, pred_dbp = preds[:, 0],   preds[:, 1]
     true_sbp, true_dbp = targets[:, 0], targets[:, 1]
@@ -265,6 +271,9 @@ def main() -> None:
     # ── Compute metrics ───────────────────────────────────────────────────────
     sbp_m = compute_metrics(pred_sbp, true_sbp)
     dbp_m = compute_metrics(pred_dbp, true_dbp)
+
+    n_samples = len(preds)
+    avg_ms_per_sample = inference_sec / n_samples * 1000
 
     print()
     print(f"{'Metric':<18}  {'SBP':>10}  {'DBP':>10}")
@@ -289,19 +298,22 @@ def main() -> None:
             print(f"  {key:<16}  {str(sv):>10}  {str(dv):>10}")
         else:
             print(f"  {key:<16}  {sv:>10{fmt}}  {dv:>10{fmt}}")
+    print(f"  {'avg_ms/sample':<16}  {avg_ms_per_sample:>10.3f}")
     print()
 
     # ── Save results ──────────────────────────────────────────────────────────
     results = {
-        "run_dir":    str(run_dir),
-        "model":      model_name,
-        "checkpoint": str(ckpt_path),
-        "best_epoch": best_epoch,
-        "test_dir":   str(test_dir),
-        "n_segments": int(len(test_ds)),
-        "n_cases":    int(test_ds.n_files),
-        "sbp":        sbp_m,
-        "dbp":        dbp_m,
+        "run_dir":          str(run_dir),
+        "model":            model_name,
+        "checkpoint":       str(ckpt_path),
+        "best_epoch":       best_epoch,
+        "test_dir":         str(test_dir),
+        "n_segments":       int(len(test_ds)),
+        "n_cases":          int(test_ds.n_files),
+        "inference_sec":    round(inference_sec, 4),
+        "avg_ms_per_sample": round(avg_ms_per_sample, 4),
+        "sbp":              sbp_m,
+        "dbp":              dbp_m,
     }
     results_path = run_dir / "eval_results.json"
     results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")

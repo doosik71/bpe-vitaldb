@@ -34,7 +34,7 @@ Usage:
 Options:
     --data-dir      Directory with .vital files   (default: data/vitaldb)
     --output-dir    Root output directory         (default: data/dataset)
-    --split         Train val test ratios         (default: 0.6 0.2 0.2)
+    --split         Train val test ratios         (default: 0.7 0.1 0.2)
     --target-hz     Output PPG sample rate (Hz)   (default: 125)
     --segment-sec   Window length in seconds      (default: 8)
     --seed          Shuffle seed                  (default: 42)
@@ -46,6 +46,7 @@ import random
 from pathlib import Path
 
 import numpy as np
+from scipy.signal import butter, sosfiltfilt
 from tqdm import tqdm
 from vitaldb.utils import VitalFile
 
@@ -54,7 +55,22 @@ SBP_RANGE = (50, 250)    # physiological bounds (mmHg)
 DBP_RANGE = (20, 150)
 BP_VALID_MIN_FRAC = 0.5  # minimum fraction of valid 1-Hz BP samples per window
 
+BANDPASS_LO    = 0.5     # Hz — high-pass cut: removes slow baseline drift
+BANDPASS_HI    = 10.0    # Hz — low-pass cut: removes high-frequency noise
+BANDPASS_ORDER = 4       # filter order (4th-order Butterworth)
+
 log = logging.getLogger(__name__)
+
+
+def _bandpass_filter(signal: np.ndarray, fs: int) -> np.ndarray:
+    """Apply a 4th-order zero-phase Butterworth bandpass filter (0.5–10 Hz).
+
+    sosfiltfilt performs forward-backward filtering, yielding zero phase
+    distortion and effectively doubling the filter order.
+    """
+    sos = butter(BANDPASS_ORDER, [BANDPASS_LO, BANDPASS_HI],
+                 btype="bandpass", fs=fs, output="sos")
+    return sosfiltfilt(sos, signal).astype(np.float32)
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,8 +84,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--output-dir",  type=Path,  default=Path("data/dataset"),
                    help="Root output directory (default: data/dataset)")
     p.add_argument("--split",       type=float, nargs=3,
-                   metavar=("TRAIN", "VAL", "TEST"), default=[0.6, 0.2, 0.2],
-                   help="Train/val/test ratios that sum to 1.0 (default: 0.6 0.2 0.2)")
+                   metavar=("TRAIN", "VAL", "TEST"), default=[0.7, 0.1, 0.2],
+                   help="Train/val/test ratios that sum to 1.0 (default: 0.7 0.1 0.2)")
     p.add_argument("--target-hz",   type=int,   default=125,
                    help="Target PPG sample rate in Hz (default: 125)")
     p.add_argument("--segment-sec", type=int,   default=8,
@@ -132,8 +148,9 @@ def process_case(
         log.warning("%s: track read error — %s", path.stem, exc)
         return None
 
-    # ── decimate PPG ─────────────────────────────────────────────────────────
-    ppg = ppg_raw[::factor]   # shape: (T * target_hz / SOURCE_HZ,)
+    # ── decimate PPG then bandpass-filter ────────────────────────────────────
+    ppg = ppg_raw[::factor]                   # shape: (T * target_hz / SOURCE_HZ,)
+    ppg = _bandpass_filter(ppg, target_hz)    # 4th-order Butterworth 0.5–10 Hz
 
     # ── compute window count ─────────────────────────────────────────────────
     total_sec = min(len(ppg) / target_hz, len(sbp_1hz), len(dbp_1hz))

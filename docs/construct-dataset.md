@@ -85,7 +85,7 @@ bin/construct-dataset.bat
 uv run python scripts/construct-dataset.py \
   --data-dir data/vitaldb \
   --output-dir data/dataset \
-  --split 0.6 0.2 0.2 \
+  --split 0.7 0.1 0.2 \
   --target-hz 125 \
   --segment-sec 8 \
   --seed 42
@@ -101,7 +101,7 @@ uv run python scripts/construct-dataset.py \
   - 기본값: `data/dataset`
 - `--split TRAIN VAL TEST`
   - 케이스 단위 분할 비율
-  - 기본값: `0.6 0.2 0.2`
+  - 기본값: `0.7 0.1 0.2`
   - 세 값의 합은 반드시 `1.0`이어야 한다.
 - `--target-hz`
   - 출력 PPG 샘플링 주파수
@@ -131,7 +131,7 @@ uv run python scripts/construct-dataset.py --output-dir data/dataset-125hz
 분할 비율 변경:
 
 ```bash
-uv run python scripts/construct-dataset.py --split 0.7 0.15 0.15
+uv run python scripts/construct-dataset.py --split 0.8 0.1 0.1
 ```
 
 ---
@@ -177,18 +177,40 @@ n_test  = 나머지 전부
 
 파일을 열 수 없거나 트랙 읽기에 실패하면 해당 케이스는 skip된다.
 
-### 4.4 PPG 다운샘플링
+### 4.4 PPG 다운샘플링 및 대역통과 필터링
 
-원본 PPG는 500 Hz다. 구현은 저역통과 필터를 적용하지 않고,
-단순 슬라이싱 `ppg_raw[::factor]`로 decimation 한다.
+원본 PPG는 500 Hz다. 처리는 두 단계로 이루어진다.
 
-예:
+#### 4.4.1 Decimation
+
+단순 슬라이싱 `ppg_raw[::factor]`로 목표 샘플링 주파수로 낮춘다.
 
 - `target_hz=125`이면 `factor=4`
 - `target_hz=100`이면 `factor=5`
 
 `500 % target_hz != 0`이면 즉시 `ValueError`를 발생시킨다.
-즉, 현재 허용되는 대표적인 값은 `250`, `125`, `100`, `50`, `25` 등이다.
+허용되는 대표적인 값은 `250`, `125`, `100`, `50`, `25` 등이다.
+
+#### 4.4.2 4차 버터워스 대역통과 필터
+
+Decimation 직후 `_bandpass_filter(ppg, target_hz)`를 적용한다.
+
+- 통과 대역: **0.5 Hz ~ 10 Hz**
+- 필터 차수: **4차 버터워스 (Butterworth)**
+- 구현: `scipy.signal.sosfiltfilt` (SOS 방식, 전·후진 필터링)
+- 위상 왜곡: **0** (zero-phase)
+
+선택 이유:
+
+| 주파수 대역 | 역할 |
+| --- | --- |
+| 0.5 Hz 이하 제거 (고역통과) | 호흡, 체동에 의한 느린 기저선 변동(baseline wander) 제거 |
+| 10 Hz 이상 제거 (저역통과) | 전기적 잡음, 고주파 간섭 제거; PPG 주요 성분(~5 Hz)은 보존 |
+
+`sosfiltfilt`는 forward-backward 필터링으로 위상 왜곡 없이 반환한다.
+필터 계수는 케이스마다 재계산하지 않고 `butter()`로 호출 시 계산된다.
+신호 길이가 충분히 짧은 케이스(`total_sec < segment_sec`)는 이미 버려지므로
+edge effect 문제는 실질적으로 발생하지 않는다.
 
 ### 4.5 시간 길이 정렬
 
@@ -325,9 +347,9 @@ BP 수치 배열에서 유효한 값만 골라 평균 레이블을 만든다.
 
 ```text
 Found 3000 .vital files in data/vitaldb
-Settings: target_hz=125  segment_sec=8s  overlap=4s  split=60/20/20
-  train : 1800 cases
-  val   : 600 cases
+Settings: target_hz=125  segment_sec=8s  overlap=4s  split=70/10/20
+  train : 2100 cases
+  val   : 300 cases
   test  : 600 cases
 ```
 
@@ -356,17 +378,17 @@ test  done —  41000 segments from  565 cases (35 skipped)
 현재 구현은 리샘플링이 아니라 단순 decimation이다.
 따라서 `target_hz=128` 같은 값은 허용되지 않는다.
 
-### 7.2 저역통과 필터가 없다
+### 7.2 대역통과 필터 설계 근거
 
-`ppg_raw[::factor]`만 사용하므로, 신호처리 관점에서는 anti-aliasing 필터가 없다.
-현재 프로젝트에서는 단순성과 속도를 우선한 구현이다.
+PPG 신호는 심박(~1 Hz 기반)과 그 고조파를 포함하며 주요 에너지는 0.5 ~ 5 Hz 대역에 집중되어 있다.
+4차 버터워스 0.5–10 Hz 대역통과 필터를 선택한 이유는 다음과 같다.
 
-향후 더 엄밀한 전처리가 필요하면:
-
-- decimation 전 low-pass filter 적용
-- `scipy.signal.decimate` 또는 동등한 방법 사용
-
-같은 확장이 가능하다.
+- **하한 0.5 Hz**: 호흡(0.1–0.4 Hz)이나 체동, 전극 접촉에 의한 느린 baseline wander를 제거한다.
+  0.5 Hz 이상을 유지하면 정상 심박(50–200 bpm = 0.83–3.3 Hz)은 모두 통과한다.
+- **상한 10 Hz**: PPG 파형의 이차 미분(APG)까지 포함해도 의미 있는 성분은 10 Hz 이내다.
+  이 이상은 전기적 잡음, EMG 간섭으로 분류하여 제거한다.
+- **4차 버터워스**: 통과 대역이 최대한 평탄(maximally flat)하며 차단 대역 roll-off가 충분히 가파르다.
+  `sosfiltfilt`(전·후진 이중 적용)로 등가 8차 zero-phase 응답을 얻어 위상 왜곡을 완전히 제거한다.
 
 ### 7.3 레이블은 1 Hz 평균값이다
 
@@ -428,8 +450,9 @@ uv run python -c "import numpy as np; d=np.load('data/dataset/train/1.npz'); pri
 
 현재 구현의 핵심 특징은 다음과 같다.
 
-- 케이스 단위 split으로 데이터 누수를 방지한다.
-- PPG를 500 Hz에서 목표 주파수로 단순 decimation 한다.
+- 케이스 단위 split(기본값 70 / 10 / 20)으로 데이터 누수를 방지한다.
+- PPG를 500 Hz에서 목표 주파수로 단순 decimation 후
+  4차 버터워스 대역통과 필터(0.5–10 Hz, zero-phase)를 적용한다.
 - 8초 기본 윈도우와 50% overlap으로 세그먼트를 만든다.
 - 1 Hz BP 수치의 구간 평균으로 `SBP`, `DBP` 레이블을 만든다.
 - 품질이 낮거나 생리적으로 이상한 구간은 적극적으로 제거한다.

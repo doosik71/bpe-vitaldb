@@ -54,7 +54,7 @@ bpe-vitaldb/
 │   ├── share-data.bat              # run scripts/share-data.py (HTTP server)
 │   ├── download-shared-data.bat    # download data/ from a remote share-data host
 │   ├── print-model.bat             # run scripts/print-model.py
-│   ├── train-model.bat             # run scripts/train.py
+│   ├── train-model.bat             # run scripts/train-model.py
 │   ├── train-status.bat            # run scripts/train-status.py
 │   └── eval-model.bat              # run scripts/eval-model.py
 ├── scripts/
@@ -64,9 +64,9 @@ bpe-vitaldb/
 │   ├── dataset-browser.py          # GUI dataset segment browser
 │   ├── share-data.py               # multi-threaded HTTP file server
 │   ├── print-model.py              # layer structure and output shape inspector
-│   ├── train.py                    # model training pipeline
+│   ├── train-model.py              # model training pipeline
 │   ├── train-status.py             # plot training metrics from a run directory
-│   └── eval-model.py                     # evaluate best.pt on the test split
+│   └── eval-model.py               # evaluate best.pt on the test split
 ├── data/
 │   ├── vitaldb/                    # downloaded .vital files (git-ignored)
 │   ├── dataset/                    # NPZ segment files (git-ignored)
