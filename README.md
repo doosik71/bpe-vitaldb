@@ -314,11 +314,11 @@ bin\train-model.bat --model st_resnet --epochs 150 --batch-size 512
 bin\train-model.bat --model minception --lr 5e-4 --patience 20
 
 # resume from a previous checkpoint
-bin\train-model.bat --model resnet1d --resume data\models\resnet1d\<run-id>\last.pt
+bin\train-model.bat --model resnet1d --resume data\models\resnet1d\last.pt
 ```
 
 Checkpoints and a metrics CSV are saved under
-`data/models/<model>/<run-id>/`.
+`data/models/<model>/`.
 
 | Option           | Default        | Description                                |
 | ---------------- | -------------- | ------------------------------------------ |
@@ -344,8 +344,8 @@ Run `bin\train-model.bat --help` for the full option listing.
 Plot loss and MAE curves for any run while training is in progress or after it completes:
 
 ```bash
-bin\train-status.bat data\models\resnet1d\<run-id>   # Windows
-bin/train-status     data/models/resnet1d/<run-id>   # Linux / macOS
+bin\train-status.bat data\models\resnet1d   # Windows
+bin/train-status     data/models/resnet1d   # Linux / macOS
 ```
 
 Two PNG files are written next to `metrics.csv` inside the run directory:
@@ -366,8 +366,8 @@ A summary table is also printed to the terminal.
 Run the trained model on the held-out test split and compute clinical metrics:
 
 ```bash
-bin\eval-model.bat data\models\resnet1d\<run-id>   # Windows
-bin/eval-model     data/models/resnet1d/<run-id>   # Linux / macOS
+bin\eval-model.bat data\models\resnet1d   # Windows
+bin/eval-model     data/models/resnet1d   # Linux / macOS
 ```
 
 Three result files are saved in the run directory:

@@ -10,7 +10,7 @@ writes evaluation results to the same directory:
 
 Usage:
     uv run python scripts/eval.py <run_dir> [OPTIONS]
-    uv run python scripts/eval.py data/models/resnet1d/20260101_120000
+    uv run python scripts/eval.py data/models/resnet1d
 
 Options:
     --dataset-dir   Root dataset directory  (default: data/dataset)

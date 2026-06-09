@@ -9,9 +9,9 @@ rem   error_hist.png      -- error distribution histograms for SBP and DBP
 rem
 rem Usage:
 rem   bin\eval-model.bat <run_dir> [OPTIONS]
-rem   bin\eval-model.bat data\models\resnet1d\20260101_120000
-rem   bin\eval-model.bat data\models\resnet1d\20260101_120000 --dataset-dir data\dataset
-rem   bin\eval-model.bat data\models\resnet1d\20260101_120000 --device cuda
+rem   bin\eval-model.bat data\models\resnet1d
+rem   bin\eval-model.bat data\models\resnet1d --dataset-dir data\dataset
+rem   bin\eval-model.bat data\models\resnet1d --device cuda
 rem
 rem Options:
 rem   --dataset-dir <path>   Root dataset directory  (default: data\dataset)

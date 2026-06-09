@@ -9,9 +9,9 @@
 #
 # Usage:
 #   bin/eval-model <run_dir> [OPTIONS]
-#   bin/eval-model data/models/resnet1d/20260101_120000
-#   bin/eval-model data/models/resnet1d/20260101_120000 --dataset-dir data/dataset
-#   bin/eval-model data/models/resnet1d/20260101_120000 --device cuda
+#   bin/eval-model data/models/resnet1d
+#   bin/eval-model data/models/resnet1d --dataset-dir data/dataset
+#   bin/eval-model data/models/resnet1d --device cuda
 #
 # Options:
 #   --dataset-dir <path>   Root dataset directory  (default: data/dataset)

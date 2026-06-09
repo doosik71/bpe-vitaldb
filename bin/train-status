@@ -7,8 +7,8 @@
 #
 # Usage:
 #   bin/train-status <run_dir>
-#   bin/train-status data/models/resnet1d/20260101_120000
-#   bin/train-status data/models/resnet1d/20260101_120000 --no-save
+#   bin/train-status data/models/resnet1d
+#   bin/train-status data/models/resnet1d --no-save
 
 set -euo pipefail
 cd "$(dirname "$0")/.."

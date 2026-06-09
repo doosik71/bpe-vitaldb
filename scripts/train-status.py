@@ -7,7 +7,7 @@ Reads metrics.csv from a run directory and writes two PNG graphs:
 
 Usage:
     uv run python scripts/train-status.py <run_dir>
-    uv run python scripts/train-status.py data/models/resnet1d/20260101_120000
+    uv run python scripts/train-status.py data/models/resnet1d
 """
 
 import argparse
@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "run_dir", type=Path,
-        help="Path to run directory (data/models/<model>/<datetime>)",
+        help="Path to run directory (data/models/<model>)",
     )
     p.add_argument(
         "--no-save", action="store_true",

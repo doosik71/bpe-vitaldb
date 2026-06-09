@@ -1,7 +1,7 @@
 """
-Collect result files from all model run directories.
+Collect result files from all model directories.
 
-Scans data/models/<model>/<run-id>/ and copies the most-recent run's files.
+Scans data/models/<model>/ and copies files from each model directory.
 
 Files collected:
   loss_graph.png    → images/loss_graph/<model>.png
@@ -54,25 +54,17 @@ def collect(models_dir: Path, images_dir: Path, logs_dir: Path, pt_dir: Path) ->
         print(f"Models directory not found: {models_dir}")
         return
 
-    # group run directories by model name
-    model_runs: dict[str, list[Path]] = {}
-    for run_dir in models_dir.glob("*/*"):
-        if not run_dir.is_dir():
-            continue
-        model_name = run_dir.parent.name
-        model_runs.setdefault(model_name, []).append(run_dir)
-
-    if not model_runs:
-        print("No run directories found.")
+    model_dirs = sorted(d for d in models_dir.iterdir() if d.is_dir())
+    if not model_dirs:
+        print("No model directories found.")
         return
 
     copied = 0
-    for model_name, run_dirs in sorted(model_runs.items()):
-        # pick the most recent run (run directories are timestamp-named)
-        latest_run = sorted(run_dirs)[-1]
+    for model_dir in model_dirs:
+        model_name = model_dir.name
 
         for graph_name in GRAPH_NAMES:
-            src = latest_run / graph_name
+            src = model_dir / graph_name
             if not src.exists():
                 continue
             graph_type = graph_name.removesuffix(".png")
@@ -87,7 +79,7 @@ def collect(models_dir: Path, images_dir: Path, logs_dir: Path, pt_dir: Path) ->
             ("eval_results.json", logs_dir / "eval_results", ".json"),
             ("metrics.csv",       logs_dir / "metrics",      ".csv"),
         ]:
-            src = latest_run / src_name
+            src = model_dir / src_name
             if not src.exists():
                 continue
             dest_subdir.mkdir(parents=True, exist_ok=True)
@@ -96,7 +88,7 @@ def collect(models_dir: Path, images_dir: Path, logs_dir: Path, pt_dir: Path) ->
             print(f"  {src}  →  {dest}")
             copied += 1
 
-        src = latest_run / "best.pt"
+        src = model_dir / "best.pt"
         if src.exists():
             pt_dir.mkdir(parents=True, exist_ok=True)
             dest = pt_dir / f"{model_name}.pt"

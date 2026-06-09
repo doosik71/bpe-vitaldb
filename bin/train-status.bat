@@ -7,8 +7,8 @@ rem   mae_graph.png   -- SBP/DBP MAE (train + val) per epoch
 rem
 rem Usage:
 rem   bin\train-status.bat <run_dir>
-rem   bin\train-status.bat data\models\resnet1d\20260101_120000
-rem   bin\train-status.bat data\models\resnet1d\20260101_120000 --no-save
+rem   bin\train-status.bat data\models\resnet1d
+rem   bin\train-status.bat data\models\resnet1d --no-save
 
 cd /d "%~dp0.."
 uv run python scripts\train-status.py %*

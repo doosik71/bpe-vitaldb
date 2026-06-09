@@ -9,8 +9,8 @@ x-axis: trainable parameter count (log scale)
 y-axis: metric value (mmHg)
 
 Data sources:
-  data/models/<model>/struct.txt              — trainable parameter count
-  data/models/<model>/<run>/eval_results.json — metric values (most recent run)
+  data/models/<model>/struct.txt           — trainable parameter count
+  data/models/<model>/eval_results.json    — metric values
 
 Output:
   images/mae.png
@@ -95,19 +95,12 @@ def load_model_data(models_dir: Path) -> list[dict]:
             print(f"  [warn] could not parse param count from {struct_path}")
             continue
 
-        # pick most recent run directory that has eval_results.json
-        run_dirs = sorted(d for d in model_dir.iterdir() if d.is_dir())
-        eval_data = None
-        for run_dir in reversed(run_dirs):
-            eval_path = run_dir / "eval_results.json"
-            if eval_path.exists():
-                with open(eval_path, encoding="utf-8") as f:
-                    eval_data = json.load(f)
-                break
-
-        if eval_data is None:
+        eval_path = model_dir / "eval_results.json"
+        if not eval_path.exists():
             print(f"  [warn] no eval_results.json found for {model_dir.name}")
             continue
+        with open(eval_path, encoding="utf-8") as f:
+            eval_data = json.load(f)
 
         records.append({
             "model":    model_dir.name,

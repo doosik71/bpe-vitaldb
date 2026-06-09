@@ -8,7 +8,7 @@ Typical usage::
         scheduler=scheduler,
         criterion=nn.HuberLoss(delta=5.0),
         device=device,
-        run_dir=Path("data/models/resnet1d/20260102_120000"),
+        run_dir=Path("data/models/resnet1d"),
     )
     result = trainer.fit(train_loader, val_loader, epochs=100, patience=15)
 """

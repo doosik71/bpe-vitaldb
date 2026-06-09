@@ -30,7 +30,7 @@
 - 데이터셋 루트: 기본값 `data/dataset`
 - 모델 루트: 기본값 `data/models`
 - 기대 모델 경로:
-  - `data/models/pulsewo_resnet1d/<run>/best.pt`
+  - `data/models/pulsewo_resnet1d/best.pt`
 
 데이터셋 파일은 `dataset-browser.py`와 동일하게 다음 형식을 가정한다.
 
@@ -141,11 +141,10 @@ uv run python scripts/pulse-browser.py --models-dir data/models-experiment
 `find_best_pt(models_dir)`는 다음 경로를 찾는다.
 
 ```text
-<models-dir>/pulsewo_resnet1d/<run>/best.pt
+<models-dir>/pulsewo_resnet1d/best.pt
 ```
 
-`pulsewo_resnet1d` 디렉터리 아래의 run 디렉터리를 정렬한 뒤,
-가장 최근 쪽부터 역순으로 탐색하여 `best.pt`가 있는 첫 run을 선택한다.
+`pulsewo_resnet1d` 디렉터리에서 `best.pt`를 직접 찾는다.
 
 ### 비동기 로딩
 

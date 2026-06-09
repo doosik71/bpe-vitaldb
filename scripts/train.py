@@ -1,7 +1,7 @@
 """
 Train a direct-regression BP model on the VitalDB NPZ dataset.
 
-Saves checkpoints and a metrics CSV under data/models/<model>/<run-id>/.
+Saves checkpoints and a metrics CSV under data/models/<model>/.
 
 Usage:
     uv run python scripts/train.py --model resnet1d [OPTIONS]
@@ -22,7 +22,7 @@ Options:
     --workers            DataLoader worker processes   (default: 4)
     --preload            Load all segments into RAM before training
     --no-normalize       Skip per-segment z-score normalization
-    --resume             Path to a checkpoint .pt to resume from
+    --resume             Path to a checkpoint .pt to resume from  (default: data/models/<model>/last.pt)
 
 Augmentation (all enabled by default; use --no-* to disable):
     --no-aug-noise       Disable Gaussian noise (std=0.01)
@@ -41,7 +41,6 @@ import json
 import logging
 import random
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -182,8 +181,7 @@ def set_seed(seed: int) -> None:
 
 
 def make_run_dir(output_dir: Path, model_name: str) -> Path:
-    stamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = output_dir / model_name / stamp
+    run_dir = output_dir / model_name
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
