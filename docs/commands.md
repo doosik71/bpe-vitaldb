@@ -9,26 +9,26 @@ bin/construct-dataset
 ## 모델 학습
 
 ```bash
-bin/train-model --device cuda:0 --model acfa              ; \
-bin/train-model --device cuda:0 --model ae_lstm           ; \
-bin/train-model --device cuda:0 --model cnn_bilstm_at
-
-bin/train-model --device cuda:1 --model minception        ; \
-bin/train-model --device cuda:1 --model mtae_tr           ; \
-bin/train-model --device cuda:1 --model mtae              ; \
-bin/train-model --device cuda:1 --model naive             ; \
-bin/train-model --device cuda:1 --model pulse_resnet1d    ; \
-bin/train-model --device cuda:1 --model pulsew_resnet1d
-
-bin/train-model --device cuda:2 --model pulsewo_resnet1d  ; \
-bin/train-model --device cuda:2 --model pulsewoq_resnet1d ; \
-bin/train-model --device cuda:2 --model resnet1d_micro    ; \
-bin/train-model --device cuda:2 --model resnet1d_mini
-
-bin/train-model --device cuda:3 --model resnet1d_tiny     ; \
-bin/train-model --device cuda:3 --model resnet1d          ; \
-bin/train-model --device cuda:3 --model st_resnet         ; \
-bin/train-model --device cuda:3 --model xresnet1d
+bin/train-model --model acfa
+bin/train-model --model ae_lstm
+bin/train-model --model cnn_bilstm_at
+bin/train-model --model conv_reg
+bin/train-model --model conv_reg_at
+bin/train-model --model conv_reg_ds
+bin/train-model --model minception
+bin/train-model --model mtae
+bin/train-model --model mtae_tr
+bin/train-model --model naive
+bin/train-model --model pulse_resnet1d
+bin/train-model --model pulsew_resnet1d
+bin/train-model --model pulsewo_resnet1d
+bin/train-model --model pulsewoq_resnet1d
+bin/train-model --model resnet1d
+bin/train-model --model resnet1d_micro
+bin/train-model --model resnet1d_mini
+bin/train-model --model resnet1d_tiny
+bin/train-model --model st_resnet
+bin/train-model --model xresnet1d
 ```
 
 ## 모델 구조 출력

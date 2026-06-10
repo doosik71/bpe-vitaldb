@@ -286,19 +286,22 @@ Available model architectures:
 
 | Model name          | Description                                                             | Layers |  Params |
 | ------------------- | ----------------------------------------------------------------------- | -----: | ------: |
-| `resnet1d`          | 1D ResNet — lightweight, fast baseline                                  |    100 |  2.18 M |
-| `resnet1d_mini`     | ResNet1D 50 % depth (4 stages × 1 block)                                |     60 | 964.4 K |
-| `resnet1d_tiny`     | ResNet1D 25 % depth (2 stages × 1 block)                                |     34 |  60.6 K |
-| `resnet1d_micro`    | ResNet1D ~10 % depth (1 stage × 1 block)                                |     21 |  15.1 K |
-| `st_resnet`         | Spectro-Temporal ResNet (PPG + VPG + APG branches)                      |    140 | 478.9 K |
-| `minception`        | Multi-scale Inception 1D CNN                                            |    134 | 440.7 K |
-| `xresnet1d`         | Deep XResNet-101-style 1D CNN                                           |    484 |  9.47 M |
-| `mtae`              | Multi-Task AutoEncoder (reconstruction + BP head)                       |     37 | 119.5 K |
-| `mtae_tr`           | MTAE with Transformer encoder/decoder (MAE-style)                       |     93 | 109.4 K |
-| `pulsewoq_resnet1d` | Overlapping-segment ResNet with explicit quality supervision and output |     38 |  30.1 K |
 | `acfa`              | ACFA: DyCASNet + xLSTM + Transformer + FKAN (Li et al., 2026)           |    108 | 542.6 K |
 | `ae_lstm`           | Autoencoder-LSTM: encoder/decoder + BP head (Vanithamani et al., 2025)  |      7 |  50.6 K |
 | `cnn_bilstm_at`     | CNN–BiLSTM with additive attention (Mohammadi et al., 2025)             |     17 | 691.3 K |
+| `conv_reg`          | Simple 6-stage 1D CNN regression baseline                               |     29 |  36.9 K |
+| `conv_reg_at`       | ConvReg with temporal attention pooling instead of global AvgPool       |     32 |  39.0 K |
+| `conv_reg_ds`       | ConvReg with depthwise-separable convolutions (fewer parameters)        |     44 |  14.1 K |
+| `minception`        | Multi-scale Inception 1D CNN                                            |    134 | 440.7 K |
+| `mtae_tr`           | MTAE with Transformer encoder/decoder (MAE-style)                       |     93 | 109.4 K |
+| `mtae`              | Multi-Task AutoEncoder (reconstruction + BP head)                       |     37 | 119.5 K |
+| `pulsewoq_resnet1d` | Overlapping-segment ResNet with explicit quality supervision and output |     38 |  30.1 K |
+| `resnet1d_micro`    | ResNet1D ~10 % depth (1 stage × 1 block)                                |     21 |  15.1 K |
+| `resnet1d_mini`     | ResNet1D 50 % depth (4 stages × 1 block)                                |     60 | 964.4 K |
+| `resnet1d_tiny`     | ResNet1D 25 % depth (2 stages × 1 block)                                |     34 |  60.6 K |
+| `resnet1d`          | 1D ResNet — lightweight, fast baseline                                  |    100 |  2.18 M |
+| `st_resnet`         | Spectro-Temporal ResNet (PPG + VPG + APG branches)                      |    140 | 478.9 K |
+| `xresnet1d`         | Deep XResNet-101-style 1D CNN                                           |    484 |  9.47 M |
 
 > Layers = total named modules (forward hooks); Params = trainable parameters.  
 > Input: PPG segment (1, 1000) — 8 s @ 125 Hz.

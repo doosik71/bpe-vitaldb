@@ -56,9 +56,9 @@ SBP MAE 1.88 mmHg, DBP MAE 1.34 mmHg를 보고하였다.
                         │
     ┌───────────────────┴──────────────────────────┐
     │  Additive Attention                          │
-    │  e_t = tanh(W_a·h_t + b_a)   (Eq. 2)         │
+    │  e_t = tanh(W_a·h_t + b_a)     (Eq. 2)       │
     │  α_t = softmax({e_t})          (Eq. 3)       │
-    │  c   = Σ_t α_t·h_t            (Eq. 4)        │
+    │  c   = Σ_t α_t·h_t             (Eq. 4)       │
     └───────────────────┬──────────────────────────┘
                       (B, 256)
                         │

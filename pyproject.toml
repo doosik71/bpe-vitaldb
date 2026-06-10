@@ -12,10 +12,12 @@ description = "Blood pressure estimation from PPG using VitalDB and PyTorch"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "jupyter>=1.1.1",
     "matplotlib>=3.10.9",
     "numpy>=1.26",
     "scipy>=1.11",
     "torch>=2.5.1",
+    "torchinfo>=1.8.0",
     "tqdm>=4.67.3",
     "vitaldb>=1.6.4",
 ]
