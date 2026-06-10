@@ -194,21 +194,37 @@ def save_config(run_dir: Path, args: argparse.Namespace) -> None:
 
 
 def load_resume(
-    model: nn.Module,
+    model:     nn.Module,
     optimizer: torch.optim.Optimizer,
-    path: Path,
-    device: torch.device,
-) -> int:
-    """Load checkpoint; return the epoch to resume from."""
-    ckpt  = torch.load(path, map_location=device, weights_only=True)
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None,
+    path:      Path,
+    device:    torch.device,
+) -> dict:
+    """Load checkpoint and restore all training state.
+
+    Returns a dict with keys:
+        start_epoch, best_val_loss, no_improve, best_epoch,
+        best_val_sbp_mae, best_val_dbp_mae
+    """
+    ckpt = torch.load(path, map_location=device, weights_only=True)
     model.load_state_dict(ckpt["model_state_dict"])
     optimizer.load_state_dict(ckpt["optimizer_state_dict"])
-    epoch = ckpt.get("epoch", 0)
+    if scheduler is not None and "scheduler_state_dict" in ckpt:
+        scheduler.load_state_dict(ckpt["scheduler_state_dict"])
+    state = {
+        "start_epoch":      ckpt.get("epoch",         0),
+        "best_val_loss":    ckpt.get("best_val_loss",  float("inf")),
+        "no_improve":       ckpt.get("no_improve",     0),
+        "best_epoch":       ckpt.get("best_epoch",     0),
+        "best_val_sbp_mae": ckpt.get("val_sbp_mae",    float("nan")),
+        "best_val_dbp_mae": ckpt.get("val_dbp_mae",    float("nan")),
+    }
     log.info(
-        "Resumed from %s (epoch %d, val_loss=%.4f)",
-        path, epoch, ckpt.get("val_loss", float("nan")),
+        "Resumed from %s  (epoch %d, best_val_loss=%.4f, no_improve=%d)",
+        path, state["start_epoch"],
+        state["best_val_loss"], state["no_improve"],
     )
-    return epoch
+    return state
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -317,8 +333,16 @@ def main() -> None:
     )
 
     # ── Optional resume ───────────────────────────────────────────────────────
-    if args.resume:
-        load_resume(model, optimizer, args.resume, device)
+    resume_path = args.resume
+    if resume_path is None:
+        candidate = args.output_dir / args.model / "last.pt"
+        if candidate.exists():
+            resume_path = candidate
+            log.info("Auto-detected checkpoint: %s", resume_path)
+
+    resume_state: dict = {}
+    if resume_path:
+        resume_state = load_resume(model, optimizer, scheduler, resume_path, device)
 
     # ── Run directory and config ──────────────────────────────────────────────
     run_dir = make_run_dir(args.output_dir, args.model)
@@ -344,6 +368,10 @@ def main() -> None:
         val_loader,
         epochs=args.epochs,
         patience=args.patience,
+        start_epoch=resume_state.get("start_epoch",   0),
+        best_val_loss=resume_state.get("best_val_loss", float("inf")),
+        no_improve=resume_state.get("no_improve",    0),
+        best_epoch=resume_state.get("best_epoch",    0),
     )
 
     # ── Final summary ─────────────────────────────────────────────────────────

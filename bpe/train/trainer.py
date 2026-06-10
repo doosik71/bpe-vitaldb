@@ -78,26 +78,52 @@ class Trainer:
         train_loader: DataLoader,
         val_loader:   DataLoader,
         *,
-        epochs:  int = 100,
-        patience: int = 15,
+        epochs:        int   = 100,
+        patience:      int   = 15,
+        start_epoch:   int   = 0,
+        best_val_loss: float = float("inf"),
+        no_improve:    int   = 0,
+        best_epoch:    int   = 0,
+        best_metrics:  dict  | None = None,
     ) -> dict:
         """Run the full training loop.
+
+        Args:
+            start_epoch:   Resume from this epoch (0 = fresh start).
+            best_val_loss: Best validation loss seen so far (for early stopping).
+            no_improve:    Epochs without improvement seen so far.
+            best_epoch:    Epoch index of the current best checkpoint.
+            best_metrics:  Metrics dict of the current best checkpoint.
 
         Returns:
             dict with keys ``best_epoch``, ``best_val_loss``,
             ``best_val_sbp_mae``, ``best_val_dbp_mae``.
         """
-        self._open_csv()
-        best_val_loss = float("inf")
-        best_epoch    = 0
-        best_metrics: dict = {}
-        no_improve    = 0
+        if best_metrics is None:
+            best_metrics = {}
 
-        log.info("Starting training for up to %d epochs (patience=%d)", epochs, patience)
+        if start_epoch >= epochs:
+            log.info(
+                "Already trained for %d epochs (max=%d). Nothing to do.",
+                start_epoch, epochs,
+            )
+            return {
+                "best_epoch":       best_epoch,
+                "best_val_loss":    best_val_loss,
+                "best_val_sbp_mae": best_metrics.get("sbp_mae", float("nan")),
+                "best_val_dbp_mae": best_metrics.get("dbp_mae", float("nan")),
+            }
+
+        self._open_csv()
+
+        log.info(
+            "Starting training from epoch %d to %d (patience=%d)",
+            start_epoch + 1, epochs, patience,
+        )
         log.info("Run directory: %s", self.run_dir)
 
         try:
-            for epoch in range(1, epochs + 1):
+            for epoch in range(start_epoch + 1, epochs + 1):
                 t0 = time.perf_counter()
                 train_m = self._run_epoch(train_loader, training=True)
                 val_m   = self._run_epoch(val_loader,   training=False)
@@ -109,15 +135,19 @@ class Trainer:
 
                 is_best = val_m["loss"] < best_val_loss
                 if is_best:
-                    best_val_loss  = val_m["loss"]
-                    best_epoch     = epoch
-                    best_metrics   = val_m
-                    no_improve     = 0
-                    self._save_checkpoint("best.pt", epoch, val_m)
+                    best_val_loss = val_m["loss"]
+                    best_epoch    = epoch
+                    best_metrics  = val_m
+                    no_improve    = 0
+                    self._save_checkpoint(
+                        "best.pt", epoch, val_m, best_val_loss, no_improve, best_epoch,
+                    )
                 else:
                     no_improve += 1
 
-                self._save_checkpoint("last.pt", epoch, val_m)
+                self._save_checkpoint(
+                    "last.pt", epoch, val_m, best_val_loss, no_improve, best_epoch,
+                )
 
                 if self.scheduler is not None:
                     self.scheduler.step()
@@ -133,8 +163,8 @@ class Trainer:
             self._close_csv()
 
         result = {
-            "best_epoch":     best_epoch,
-            "best_val_loss":  best_val_loss,
+            "best_epoch":       best_epoch,
+            "best_val_loss":    best_val_loss,
             "best_val_sbp_mae": best_metrics.get("sbp_mae", float("nan")),
             "best_val_dbp_mae": best_metrics.get("dbp_mae", float("nan")),
         }
@@ -192,19 +222,29 @@ class Trainer:
 
     # ── Checkpointing ─────────────────────────────────────────────────────────
 
-    def _save_checkpoint(self, name: str, epoch: int, metrics: dict) -> None:
-        path = self.run_dir / name
-        torch.save(
-            {
-                "epoch":                epoch,
-                "model_state_dict":     self.model.state_dict(),
-                "optimizer_state_dict": self.optimizer.state_dict(),
-                "val_loss":             metrics["loss"],
-                "val_sbp_mae":          metrics["sbp_mae"],
-                "val_dbp_mae":          metrics["dbp_mae"],
-            },
-            path,
-        )
+    def _save_checkpoint(
+        self,
+        name:          str,
+        epoch:         int,
+        metrics:       dict,
+        best_val_loss: float,
+        no_improve:    int,
+        best_epoch:    int,
+    ) -> None:
+        ckpt = {
+            "epoch":                epoch,
+            "model_state_dict":     self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "val_loss":             metrics["loss"],
+            "val_sbp_mae":          metrics["sbp_mae"],
+            "val_dbp_mae":          metrics["dbp_mae"],
+            "best_val_loss":        best_val_loss,
+            "best_epoch":           best_epoch,
+            "no_improve":           no_improve,
+        }
+        if self.scheduler is not None:
+            ckpt["scheduler_state_dict"] = self.scheduler.state_dict()
+        torch.save(ckpt, self.run_dir / name)
 
     # ── Logging helpers ───────────────────────────────────────────────────────
 
