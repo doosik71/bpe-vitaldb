@@ -173,6 +173,50 @@ def plot_error_hist(
     plt.close(fig)
 
 
+# ── Per-case stats ────────────────────────────────────────────────────────────
+
+def compute_per_case_stats(
+    preds: np.ndarray,
+    targets: np.ndarray,
+    segs: list[tuple[int, int]],
+    files: list[Path],
+) -> dict:
+    """Return best_case_id and worst_case_id by average (SBP+DBP) MAE."""
+    from collections import defaultdict
+
+    file_to_indices: dict[int, list[int]] = defaultdict(list)
+    for seg_idx, (file_idx, _) in enumerate(segs):
+        file_to_indices[file_idx].append(seg_idx)
+
+    best_case_id = None
+    worst_case_id = None
+    best_avg_mae  = float("inf")
+    worst_avg_mae = float("-inf")
+
+    for file_idx, indices in file_to_indices.items():
+        idx = np.array(indices)
+        sbp_mae = float(np.mean(np.abs(preds[idx, 0] - targets[idx, 0])))
+        dbp_mae = float(np.mean(np.abs(preds[idx, 1] - targets[idx, 1])))
+        avg_mae = (sbp_mae + dbp_mae) / 2.0
+
+        stem = files[file_idx].stem
+        case_id = int(stem) if stem.isdigit() else stem
+
+        if avg_mae < best_avg_mae:
+            best_avg_mae  = avg_mae
+            best_case_id  = case_id
+        if avg_mae > worst_avg_mae:
+            worst_avg_mae = avg_mae
+            worst_case_id = case_id
+
+    return {
+        "best_case_id":      best_case_id,
+        "best_case_avg_mae": round(best_avg_mae,  4),
+        "worst_case_id":     worst_case_id,
+        "worst_case_avg_mae": round(worst_avg_mae, 4),
+    }
+
+
 # ── Inference ─────────────────────────────────────────────────────────────────
 
 def run_inference(
@@ -271,6 +315,7 @@ def main() -> None:
     # ── Compute metrics ───────────────────────────────────────────────────────
     sbp_m = compute_metrics(pred_sbp, true_sbp)
     dbp_m = compute_metrics(pred_dbp, true_dbp)
+    case_m = compute_per_case_stats(preds, targets, test_ds._segs, test_ds._files)
 
     n_samples = len(preds)
     avg_ms_per_sample = inference_sec / n_samples * 1000
@@ -300,6 +345,9 @@ def main() -> None:
             print(f"  {key:<16}  {sv:>10{fmt}}  {dv:>10{fmt}}")
     print(f"  {'avg_ms/sample':<16}  {avg_ms_per_sample:>10.3f}")
     print()
+    print(f"  best  case: {case_m['best_case_id']}  (avg MAE {case_m['best_case_avg_mae']:.2f} mmHg)")
+    print(f"  worst case: {case_m['worst_case_id']}  (avg MAE {case_m['worst_case_avg_mae']:.2f} mmHg)")
+    print()
 
     # ── Save results ──────────────────────────────────────────────────────────
     results = {
@@ -314,6 +362,10 @@ def main() -> None:
         "avg_ms_per_sample": round(avg_ms_per_sample, 4),
         "sbp":              sbp_m,
         "dbp":              dbp_m,
+        "best_case_id":      case_m["best_case_id"],
+        "best_case_avg_mae": case_m["best_case_avg_mae"],
+        "worst_case_id":     case_m["worst_case_id"],
+        "worst_case_avg_mae": case_m["worst_case_avg_mae"],
     }
     results_path = run_dir / "eval_results.json"
     results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")

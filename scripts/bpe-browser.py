@@ -80,8 +80,8 @@ FG_BRIGHT = "#1133cc"
 ACCENT    = "#2255cc"
 
 PPG_COLOR    = "#1a8855"
-SBP_COLOR    = "#cc2200"
-DBP_COLOR    = "#cc7700"
+SBP_COLOR    = "#0044cc"   # blue
+DBP_COLOR    = "#0088ff"   # light blue
 PRED_SBP_CLR = "#dd5533"
 PRED_DBP_CLR = "#dd9922"
 GRID_CLR     = "#e8e8ee"
@@ -912,10 +912,10 @@ class BPEBrowser:
                     solid_capstyle="round",
                 )
 
-                # GT dot (circle)
+                # GT dot (x mark)
                 ax_bp.scatter(
                     [pos], [gt],
-                    color=cgt, s=90, zorder=6,
+                    color=cgt, s=90, marker='x', zorder=7,
                     label=f"GT  {lbl} {gt:.0f}",
                 )
                 # Pred dot (diamond)
@@ -962,6 +962,7 @@ class BPEBrowser:
         ax_bp.set_xticks(positions)
         ax_bp.set_xticklabels(["SBP", "DBP"])
         ax_bp.set_xlim(-0.55, 1.55)
+        ax_bp.set_ylim(40, 160)
         ax_bp.set_ylabel("mmHg", color=FG_DIM, fontsize=9)
         ax_bp.tick_params(colors=FG_DIM, labelsize=8)
         for sp in ax_bp.spines.values():

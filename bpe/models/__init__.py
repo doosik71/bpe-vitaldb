@@ -6,6 +6,7 @@ from bpe.models.cnn_bilstm_at import CNNBiLSTMAttention
 from bpe.models.conv_reg import ConvReg
 from bpe.models.conv_reg_at import ConvRegAt
 from bpe.models.conv_reg_ds import ConvRegDs
+from bpe.models.conv_reg_nas import ConvRegNas
 from bpe.models.minception import MInception
 from bpe.models.mtae import MTAE
 from bpe.models.mtae_tr import MTAE_TR
@@ -34,6 +35,7 @@ __all__ = [
     "ConvReg",
     "ConvRegAt",
     "ConvRegDs",
+    "ConvRegNas",
     "MInception",
     "MTAE",
     "MTAE_TR",
