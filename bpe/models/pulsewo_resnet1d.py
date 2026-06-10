@@ -54,7 +54,7 @@ class PulseWOResNet1D(nn.Module):
         # overlapping windows via unfold: (B, C, L) → (B, C, S, seg_len)
         x = x.unfold(2, self.seg_len, self.stride)                 # (B, C, S, seg_len)
         S = x.size(2)
-        x = x.permute(0, 2, 1, 3).contiguous()                    # (B, S, C, seg_len)
+        x = x.permute(0, 2, 1, 3).contiguous()                     # (B, S, C, seg_len)
         x = x.view(B * S, C, self.seg_len)                         # (B*S, C, seg_len)
         # shared backbone → [SBP, DBP, quality] per segment
         x = self.backbone(x)                                       # (B*S, F+1)
@@ -63,4 +63,4 @@ class PulseWOResNet1D(nn.Module):
         q  = x[:, :,   self.out_features]                          # (B, S)
         # softmax-normalised quality weights over all S windows
         w = F.softmax(q, dim=1).unsqueeze(-1)                      # (B, S, 1)
-        return (w * bp).sum(dim=1)                                  # (B, F)
+        return (w * bp).sum(dim=1)                                 # (B, F)

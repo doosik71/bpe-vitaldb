@@ -28,9 +28,9 @@ PulseWOQResNet1D(Pulse With Overlapping & Quality supervision ResNet 1D)는
 PulseResNet1D           PulseWOResNet1D         PulseWOQResNet1D
 ─────────────────       ────────────────        ─────────────────────
 비중첩 세그먼트          중첩 세그먼트            중첩 세그먼트
-단순 평균 집계           소프트맥스 품질           소프트맥스 품질
+단순 평균 집계           소프트맥스 품질          소프트맥스 품질
 품질 헤드 없음           가중 집계                가중 집계
-                         품질 지도 학습 없음       품질 지도 학습 (자동)
+                         품질 지도 학습 없음      품질 지도 학습 (자동)
 ```
 
 | 항목          | PulseResNet1D             | PulseWOQResNet1D           |
@@ -57,41 +57,41 @@ PulseResNet1D           PulseWOResNet1D         PulseWOQResNet1D
                    ▼  permute + view
          (B*15, 1, 125)
                    │
-    ┌──────────────┴─────────────────────────────┐
-    │  PulseBackbone(in=1, out=3, C=16)          │
-    │                                             │
-    │  stem:  ConvBnAct1d(1→16, k=7, s=2)        │
-    │         MaxPool1d(k=3, s=2, pad=1)          │
-    │         (B*15, 1, 125) → (B*15, 16, 32)    │
-    │                                             │
-    │  stage1: BasicBlock1D(16→16, s=1)          │
-    │         (B*15, 16, 32) → (B*15, 16, 32)    │
-    │                                             │
-    │  stage2: BasicBlock1D(16→32, s=2)          │
-    │         (B*15, 16, 32) → (B*15, 32, 16)    │
-    │                                             │
-    │  stage3: BasicBlock1D(32→64, s=2)          │
-    │         (B*15, 32, 16) → (B*15, 64, 8)     │
-    │                                             │
-    │  head:  AdaptiveAvgPool1d(1) + Linear(64→3)│
-    │         (B*15, 64, 8) → (B*15, 3)          │
-    └──────────────┬─────────────────────────────┘
+    ┌──────────────┴───────────────────────────────┐
+    │  PulseBackbone(in=1, out=3, C=16)            │
+    │                                              │
+    │  stem:  ConvBnAct1d(1→16, k=7, s=2)          │
+    │         MaxPool1d(k=3, s=2, pad=1)           │
+    │         (B*15, 1, 125) → (B*15, 16, 32)      │
+    │                                              │
+    │  stage1: BasicBlock1D(16→16, s=1)            │
+    │         (B*15, 16, 32) → (B*15, 16, 32)      │
+    │                                              │
+    │  stage2: BasicBlock1D(16→32, s=2)            │
+    │         (B*15, 16, 32) → (B*15, 32, 16)      │
+    │                                              │
+    │  stage3: BasicBlock1D(32→64, s=2)            │
+    │         (B*15, 32, 16) → (B*15, 64, 8)       │
+    │                                              │
+    │  head:  AdaptiveAvgPool1d(1) + Linear(64→3)  │
+    │         (B*15, 64, 8) → (B*15, 3)            │
+    └──────────────┬───────────────────────────────┘
                    │
                    ▼  view(B, S=15, 3)
               (B, 15, 3)
-         ┌────────┴────────┐
-         │                 │
-  bp = [:,:,:2]      q = [:,:,2]
-  (B, 15, 2)         (B, 15)    q_logit 비경계(unbounded)
-  [SBP, DBP]         [품질 로짓]
-         │                 │
-         └────────┬────────┘
-                  ▼  _weighted_bp
-       w = softmax(q, dim=1)       (B, 15)
-       pred = (w · bp).sum(dim=1)  (B, 2)
-                  │
-               (B, 2)
-            [SBP, DBP]
+          ┌────────┴────────┐
+          │                 │
+   bp = [:,:,:2]      q = [:,:,2]
+   (B, 15, 2)           (B, 15)    q_logit 비경계(unbounded)
+   [SBP, DBP]         [품질 로짓]
+          │                 │
+          └────────┬────────┘
+                   ▼  _weighted_bp
+        w = softmax(q, dim=1)       (B, 15)
+        pred = (w · bp).sum(dim=1)  (B, 2)
+                   │
+                (B, 2)
+             [SBP, DBP]
 ```
 
 ## 4. 중첩 세그먼트 분할 상세

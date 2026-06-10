@@ -84,6 +84,8 @@ ACCENT    = "#2255cc"   # selection / hover accent
 PPG_COLOR    = "#1a8855"   # PPG waveform (dark green)
 SBP_COLOR    = "#cc2200"   # ground-truth SBP (dark red)
 DBP_COLOR    = "#cc7700"   # ground-truth DBP (dark amber)
+GT_SBP_COLOR = "#0044ee"   # GT SBP reference in ax_bp (light blue)
+GT_DBP_COLOR = "#0022aa"   # GT DBP reference in ax_bp (blue)
 PRED_SBP_CLR = "#dd5533"   # predicted SBP
 PRED_DBP_CLR = "#dd9922"   # predicted DBP
 WEIGHT_COLOR = "#2255bb"   # quality-weight triangles / shading
@@ -1080,12 +1082,12 @@ class PulseBrowser:
 
             # Ground-truth horizontal dashed reference lines
             ax_bp.axhline(
-                sbp_gt, color=SBP_COLOR, linewidth=1.0,
+                sbp_gt, color=GT_SBP_COLOR, linewidth=1.0,
                 linestyle="--", alpha=0.55, zorder=3,
                 label=f"GT SBP {sbp_gt:.0f}",
             )
             ax_bp.axhline(
-                dbp_gt, color=DBP_COLOR, linewidth=1.0,
+                dbp_gt, color=GT_DBP_COLOR, linewidth=1.0,
                 linestyle="--", alpha=0.55, zorder=3,
                 label=f"GT DBP {dbp_gt:.0f}",
             )
