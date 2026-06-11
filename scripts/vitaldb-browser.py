@@ -20,6 +20,8 @@ import sys
 import tkinter as tk
 import tkinter.ttk as ttk
 from pathlib import Path
+from queue import Empty, LifoQueue, Queue
+import threading
 
 import matplotlib
 matplotlib.use("TkAgg")  # must be set before importing pyplot
@@ -41,31 +43,49 @@ _set_cjk_font()
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 API_URL = "https://api.vitaldb.net"
-SRATE = 500    # waveform sample rate (Hz)
+SRATE = 500         # waveform sample rate (Hz)
 WINDOW_SEC = 30     # visible time window (s)
-STEP_SEC = 10     # navigation step (s)
+STEP_SEC = 10       # navigation step (s)
 
 # (track_name, label, color, is_waveform)
 TRACK_DEFS = [
-    ("SNUADC/PLETH",      "PPG",           "#1a8855", True),
-    ("SNUADC/ART",        "ABP",           "#cc2200", True),
-    ("SNUADC/ECG_II",     "ECG II",        "#2255bb", True),
-    ("Solar8000/ART_SBP", "SBP (mmHg)",    "#cc2200", False),
-    ("Solar8000/ART_DBP", "DBP (mmHg)",    "#cc7700", False),
-    ("Solar8000/ART_MBP", "MBP (mmHg)",    "#cc4488", False),
-    ("Solar8000/HR",      "HR (/min)",     "#0088bb", False),
+    ("SNUADC/PLETH",       "PPG",      "#1a8855", True),
+    ("SNUADC/ART",         "ABP",      "#cc2200", True),
+    ("SNUADC/ECG_II",      "ECG II",   "#2255bb", True),
+    ("Solar8000/ART_SBP",  "SBP",      "#cc2200", False),
+    ("Solar8000/ART_DBP",  "DBP",      "#2255bb", False),
+    ("Solar8000/ART_MBP",  "MBP",      "#228844", False),
+    ("Solar8000/NIBP_SBP", "NIBP SBP", "#cc2200", False),
+    ("Solar8000/NIBP_DBP", "NIBP DBP", "#2255bb", False),
+    ("Solar8000/NIBP_MBP", "NIBP MBP", "#228844", False),
 ]
-WAVE_TRACKS = [(n, l, c) for n, l, c, w in TRACK_DEFS if w]
+WAVE_TRACKS    = [(n, l, c) for n, l, c, w in TRACK_DEFS if w]
 NUMERIC_TRACKS = [(n, l, c) for n, l, c, w in TRACK_DEFS if not w]
+
+# NIBP tracks use dashed lines to distinguish from invasive ART tracks
+_NIBP_TRACKS = frozenset({
+    "Solar8000/NIBP_SBP", "Solar8000/NIBP_DBP", "Solar8000/NIBP_MBP",
+})
+# Tracks whose integer values are annotated on the numeric panel
+_LABEL_TRACKS = frozenset({
+    "Solar8000/ART_SBP",  "Solar8000/ART_DBP",
+    "Solar8000/NIBP_SBP", "Solar8000/NIBP_DBP",
+})
+_LABEL_VA = {
+    "Solar8000/ART_SBP":  "bottom",
+    "Solar8000/ART_DBP":  "top",
+    "Solar8000/NIBP_SBP": "bottom",
+    "Solar8000/NIBP_DBP": "top",
+}
 
 # Row highlight tags: (foreground, background)
 TAG_COLORS = {
-    "none":    ("#222233", "#ffffff"),
-    "ppg":     ("#228844", "#d0d0d0"),   # dark green text, gray background
-    "abp":     ("#222233", "#fdecea"),   # normal text, light red tint
-    "ppg_abp": ("#228844", "#fdecea"),   # both
+    "unknown": ("#777777", "#cccccc"),
+    "none":    ("#000000", "#ffffff"),
+    "ppg":     ("#000000", "#00aa00"),   # dark green text, gray background
+    "abp":     ("#aa0000", "#ffffff"),   # normal text, light red tint
+    "ppg_abp": ("#cc0000", "#00cc00"),   # both
 }
-
 
 # ── Data helpers ──────────────────────────────────────────────────────────────
 
@@ -88,23 +108,13 @@ def fetch_clinical_map(files: list[Path]) -> dict:
         return {}
 
 
-def fetch_track_flags(files: list[Path]) -> dict[int, tuple[bool, bool]]:
-    """Return {caseid: (has_ppg, has_abp)} from the public trks index."""
-    import warnings
-    import pandas as pd
-
-    caseids = {int(f.stem) for f in files if f.stem.isdigit()}
+def scan_track_flags(path: Path) -> tuple[bool, bool]:
+    """Read only track headers needed for list coloring."""
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            df = pd.read_csv(f"{API_URL}/trks")
-        df = df[df["caseid"].isin(caseids)]
-        ppg = set(df.loc[df["tname"] == "SNUADC/PLETH", "caseid"])
-        abp = set(df.loc[df["tname"] == "SNUADC/ART",   "caseid"])
-        return {cid: (cid in ppg, cid in abp) for cid in caseids}
+        names = set(VitalFile(str(path), header_only=True).get_track_names())
+        return "SNUADC/PLETH" in names, "SNUADC/ART" in names
     except Exception:
-        return {}
-
+        return False, False
 
 def load_vital(path: Path) -> tuple[VitalFile, dict[str, np.ndarray]]:
     """Load a .vital file; return (VitalFile, {track_name: ndarray})."""
@@ -157,13 +167,21 @@ class VitalDBBrowser:
     ]
 
     def __init__(self, root: tk.Tk, data_dir: Path,
-                 files: list[Path], ci_map: dict,
-                 track_flags: dict[int, tuple[bool, bool]]):
+                 files: list[Path], ci_map: dict):
         self.root = root
         self.data_dir = data_dir
         self.files = files
         self.ci_map = ci_map
-        self.track_flags = track_flags
+        self.track_flags: dict[int, tuple[bool, bool]] = {}
+        self._row_by_path: dict[Path, dict] = {}
+        self._filtered_rows: list[dict] = []
+        max_cid = max((int(f.stem) for f in files if f.stem.isdigit()), default=0)
+        self._track_scanned = np.zeros(max_cid + 1, dtype=bool)
+        self._track_has_ppg = np.zeros(max_cid + 1, dtype=bool)
+        self._track_has_abp = np.zeros(max_cid + 1, dtype=bool)
+        self._scan_queue: LifoQueue[Path | None] = LifoQueue()
+        self._scan_results: Queue[tuple[int, Path, bool, bool]] = Queue()
+        self._scan_stop = threading.Event()
 
         # Waveform state
         self._vf: VitalFile | None = None
@@ -183,6 +201,9 @@ class VitalDBBrowser:
         self._all_rows = self._build_rows()
 
         self._build_ui()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self._start_track_scan_worker()
+        self.root.after(120, self._drain_track_scan_results)
         self._refresh_list()
 
     # ── Row data ──────────────────────────────────────────────────────────────
@@ -207,15 +228,11 @@ class VitalDBBrowser:
                 opname = ""
                 dur_s = ""
 
-            has_ppg, has_abp = self.track_flags.get(cid, (False, False))
-            tag = ("ppg_abp" if has_ppg and has_abp
-                   else "ppg" if has_ppg
-                   else "abp" if has_abp
-                   else "none")
-
-            rows.append(dict(path=f, case=cid, duration=dur_s, dur_sec=dur,
-                             age=age, sex=sex, size=f"{size_mb:.1f}MB",
-                             size_val=size_mb, opname=opname, tag=tag))
+            row = dict(path=f, case=cid, duration=dur_s, dur_sec=dur,
+                       age=age, sex=sex, size=f"{size_mb:.1f}MB",
+                       size_val=size_mb, opname=opname, tag="unknown")
+            rows.append(row)
+            self._row_by_path[f] = row
         return rows
 
     # ── UI construction ───────────────────────────────────────────────────────
@@ -320,7 +337,7 @@ class VitalDBBrowser:
             self._tree.column(cid, width=width, anchor=anchor,
                               stretch=(cid == "opname"))
 
-        vsb = ttk.Scrollbar(frame, orient="vertical", command=self._tree.yview)
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=self._on_tree_scroll)
         self._tree.configure(yscrollcommand=vsb.set)
         self._tree.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
@@ -332,6 +349,14 @@ class VitalDBBrowser:
         self._tree.bind("<Double-1>", self._on_case_select)
         self._tree.bind("<Up>", self._on_case_key_nav)
         self._tree.bind("<Down>", self._on_case_key_nav)
+        self._tree.bind("<Prior>", self._on_tree_view_change)
+        self._tree.bind("<Next>", self._on_tree_view_change)
+        self._tree.bind("<Home>", self._on_tree_view_change)
+        self._tree.bind("<End>", self._on_tree_view_change)
+        self._tree.bind("<MouseWheel>", self._on_tree_view_change)
+        self._tree.bind("<Button-4>", self._on_tree_view_change)
+        self._tree.bind("<Button-5>", self._on_tree_view_change)
+        self._tree.bind("<Configure>", self._on_tree_view_change)
 
         # List status
         self._list_status = tk.StringVar()
@@ -508,6 +533,7 @@ class VitalDBBrowser:
             "opname": lambda r: r["opname"],
         }.get(self._sort_col, lambda r: r["case"])
         rows.sort(key=key_fn, reverse=self._sort_rev)
+        self._filtered_rows = rows
 
         # Remember current selection
         sel = self._tree.selection()
@@ -527,15 +553,12 @@ class VitalDBBrowser:
             first = self._tree.get_children()[0]
             self._tree.selection_set(first)
 
-        n_ppg = sum(1 for r in rows if r["tag"] in ("ppg", "ppg_abp"))
-        n_abp = sum(1 for r in rows if r["tag"] in ("abp", "ppg_abp"))
         arr = (" ▲" if not self._sort_rev else " ▼")
         for cid, heading, *_ in self.LIST_COLUMNS:
             self._tree.heading(cid, text=heading +
                                (arr if cid == self._sort_col else ""))
-        self._list_status.set(
-            f"{len(rows)}/{len(self._all_rows)}  PPG:{n_ppg}  ABP:{n_abp}"
-        )
+        self._update_list_status()
+        self.root.after_idle(self._queue_visible_track_scan)
 
     def _sort_by(self, col: str):
         self._sort_rev = (col == self._sort_col) and not self._sort_rev
@@ -544,6 +567,113 @@ class VitalDBBrowser:
 
     def _on_case_key_nav(self, event=None):
         self.root.after_idle(self._on_case_select)
+        self.root.after_idle(self._queue_visible_track_scan)
+
+    def _on_tree_scroll(self, *args):
+        self._tree.yview(*args)
+        self.root.after_idle(self._queue_visible_track_scan)
+
+    def _on_tree_view_change(self, event=None):
+        self.root.after_idle(self._queue_visible_track_scan)
+
+    def _tag_from_flags(self, has_ppg: bool, has_abp: bool) -> str:
+        if has_ppg and has_abp:
+            return "ppg_abp"
+        if has_ppg:
+            return "ppg"
+        if has_abp:
+            return "abp"
+        return "none"
+
+    def _visible_tree_iids(self) -> list[str]:
+        children = self._tree.get_children()
+        if not children:
+            return []
+
+        first = self._tree.identify_row(0) or children[0]
+        last = self._tree.identify_row(max(self._tree.winfo_height() - 1, 0)) or children[-1]
+
+        try:
+            i0 = children.index(first)
+            i1 = children.index(last)
+        except ValueError:
+            return []
+        if i0 > i1:
+            i0, i1 = i1, i0
+        return list(children[i0:i1 + 1])
+
+    def _queue_visible_track_scan(self):
+        for iid in reversed(self._visible_tree_iids()):
+            row = self._row_by_path.get(Path(iid))
+            if row is None or row["tag"] != "unknown":
+                continue
+            cid = row["case"]
+            if cid < len(self._track_scanned) and self._track_scanned[cid]:
+                continue
+            self._scan_queue.put(row["path"])
+
+    def _start_track_scan_worker(self):
+        def worker():
+            while not self._scan_stop.is_set():
+                try:
+                    path = self._scan_queue.get(timeout=0.2)
+                except Empty:
+                    continue
+                if path is None:
+                    break
+                cid = int(path.stem) if path.stem.isdigit() else 0
+                if cid < len(self._track_scanned) and self._track_scanned[cid]:
+                    continue
+                has_ppg, has_abp = scan_track_flags(path)
+                self._scan_results.put((cid, path, has_ppg, has_abp))
+
+        self._scan_thread = threading.Thread(
+            target=worker, name="track-scan", daemon=True
+        )
+        self._scan_thread.start()
+
+    def _drain_track_scan_results(self):
+        updated = False
+        while True:
+            try:
+                cid, path, has_ppg, has_abp = self._scan_results.get_nowait()
+            except Empty:
+                break
+
+            row = self._row_by_path.get(path)
+            if row is None:
+                continue
+
+            if cid < len(self._track_scanned):
+                self._track_scanned[cid] = True
+                self._track_has_ppg[cid] = has_ppg
+                self._track_has_abp[cid] = has_abp
+            tag = self._tag_from_flags(has_ppg, has_abp)
+            row["tag"] = tag
+            self.track_flags[row["case"]] = (has_ppg, has_abp)
+            iid = str(path)
+            if self._tree.exists(iid):
+                self._tree.item(iid, tags=(tag,))
+            updated = True
+
+        if updated:
+            self._update_list_status()
+            self.root.after_idle(self._queue_visible_track_scan)
+
+        if not self._scan_stop.is_set():
+            try:
+                self.root.after(120, self._drain_track_scan_results)
+            except tk.TclError:
+                pass
+
+    def _update_list_status(self):
+        rows = self._filtered_rows
+        n_ppg = sum(1 for r in rows if r["tag"] in ("ppg", "ppg_abp"))
+        n_abp = sum(1 for r in rows if r["tag"] in ("abp", "ppg_abp"))
+        n_scanned = sum(1 for r in rows if r["tag"] != "unknown")
+        self._list_status.set(
+            f"{len(rows)}/{len(self._all_rows)}  scanned:{n_scanned}  PPG:{n_ppg}  ABP:{n_abp}"
+        )
 
     # ── Case loading ──────────────────────────────────────────────────────────
 
@@ -699,23 +829,38 @@ class VitalDBBrowser:
                                            color="#888899", fontsize=8)
 
         if self._num_ax:
-            self._num_ax.cla()
-            self._num_ax.set_facecolor("#ffffff")
+            ax = self._num_ax
+            ax.cla()
+            ax.set_facecolor("#ffffff")
+
             for name, label, color in self._avail_numeric:
                 t, y = self._num_slice(name)
                 valid = ~np.isnan(y)
                 if valid.any():
-                    self._num_ax.plot(t[valid], y[valid], color=color,
-                                      lw=1.1, marker=".", ms=2, label=label)
-            self._num_ax.set_xlim(self._t0, t_end)
-            self._num_ax.set_ylabel("Numeric", color="#222233", fontsize=8)
-            self._num_ax.set_xlabel("Time (s)", color="#888899", fontsize=8)
-            self._num_ax.legend(loc="upper right", fontsize=7, framealpha=0.3,
-                                labelcolor="#222233", facecolor="#ffffff")
-            self._num_ax.tick_params(colors="#888899", labelsize=7)
-            self._num_ax.spines[:].set_color("#ccccdd")
-            self._num_ax.spines["top"].set_visible(False)
-            self._num_ax.spines["right"].set_visible(False)
+                    ls = "--" if name in _NIBP_TRACKS else "-"
+                    ax.plot(t[valid], y[valid], color=color,
+                            lw=1.1, linestyle=ls, marker=".", ms=3, label=label)
+                    if name in _LABEL_TRACKS:
+                        va = _LABEL_VA[name]
+                        for xi, yi in zip(t[valid], y[valid]):
+                            ax.text(xi, yi, str(int(round(yi))),
+                                    color=color, fontsize=6,
+                                    ha="center", va=va, clip_on=True)
+
+            # Expand y-limits to give the value labels room to breathe
+            y_lo, y_hi = ax.get_ylim()
+            pad = (y_hi - y_lo) * 0.12
+            ax.set_ylim(y_lo - pad, y_hi + pad)
+
+            ax.set_xlim(self._t0, t_end)
+            ax.set_ylabel("SBP / DBP / MBP (mmHg)", color="#222233", fontsize=8)
+            ax.set_xlabel("Time (s)", color="#888899", fontsize=8)
+            ax.legend(loc="upper right", fontsize=7, framealpha=0.3,
+                      labelcolor="#222233", facecolor="#ffffff")
+            ax.tick_params(colors="#888899", labelsize=7)
+            ax.spines[:].set_color("#ccccdd")
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
 
         # Time stamp in nav bar
         def _fmt(s):
@@ -899,6 +1044,11 @@ class VitalDBBrowser:
         self._status_var.set(text)
         self.root.update_idletasks()
 
+    def _on_close(self):
+        self._scan_stop.set()
+        self._scan_queue.put(None)
+        self.root.destroy()
+
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -932,10 +1082,9 @@ def main():
         sys.exit(1)
 
     ci_map = fetch_clinical_map(files)
-    track_flags = fetch_track_flags(files)
 
     root = tk.Tk()
-    app = VitalDBBrowser(root, data_dir, files, ci_map, track_flags)
+    app = VitalDBBrowser(root, data_dir, files, ci_map)
 
     # Auto-open case if specified
     if args.case is not None:

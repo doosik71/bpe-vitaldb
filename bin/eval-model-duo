@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Evaluate a two-model duo ensemble on the held-out test set.
+#
+# Runs two independently trained models in parallel and rejects measurements
+# when either model disagrees by >= threshold mmHg on SBP or DBP.
+# Accepted prediction = average of both model outputs.
+#
+# Output directory receives:
+#   eval_results.json     — metrics for all and accepted segments + rejection stats
+#   eval_plot_all.png     — predicted vs actual scatter (all segments)
+#   eval_plot.png         — predicted vs actual scatter (accepted segments)
+#   error_hist_all.png    — error histogram (all segments)
+#   error_hist.png        — error histogram (accepted segments)
+#   diff_dist.png         — inter-model disagreement distribution
+#
+# Usage:
+#   bin/eval-model-duo <output_dir> [OPTIONS]
+#   bin/eval-model-duo data/models/duo_conv_reg_ds_mtae
+#   bin/eval-model-duo data/models/duo_5mmhg --duo-models conv_reg_ds mtae --duo-threshold 5.0
+#
+# Options:
+#   --duo-models <A> <B>   Two model IDs (default: conv_reg_ds mtae)
+#   --duo-threshold <T>    Rejection threshold in mmHg (default: 5.0)
+#   --models-dir <path>    Root models directory (default: data/models)
+#   --dataset-dir <path>   Root dataset directory (default: data/dataset)
+#   --device <spec>        auto | cpu | cuda | cuda:N  (default: auto)
+#   --batch-size <N>       Inference batch size (default: 512)
+#   --no-normalize         Skip per-segment z-score normalization
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec uv run python scripts/eval-model.py "$@" --duo
