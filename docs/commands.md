@@ -114,4 +114,5 @@ bin/eval-model-pulsewoq data/models/pulsewoq_resnet1d
 
 ```bash
 bin/collect-result
+bin/generate-overview
 ```

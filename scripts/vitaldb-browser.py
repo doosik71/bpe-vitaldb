@@ -1,14 +1,14 @@
 """
 VitalDB waveform browser — unified single-window UI
 Left panel: case list (always visible, sortable, searchable)
-Right panel: matplotlib waveform canvas (updates on case click)
+Center panel: matplotlib waveform canvas (updates on case click)
+Right panel: SBP/DBP search within the current case
 
 Usage:
     uv run python scripts/vitaldb-browser.py [--data-dir data/vitaldb] [--case CASEID]
 """
 
 from vitaldb.utils import VitalFile
-from matplotlib.widgets import Slider
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import vitaldb
 import numpy as np
@@ -140,11 +140,12 @@ def duration_sec(data: dict) -> float:
 # ── Main application window ───────────────────────────────────────────────────
 
 class VitalDBBrowser:
-    """Single unified window: case list on the left, waveform canvas on the right."""
+    """Single unified window with case list, waveform canvas, and BP search."""
 
-    LIST_WIDTH = 460   # px — left panel minimum width
-    CANVAS_W = 950   # px — right panel minimum width
-    WIN_H = 700
+    LIST_WIDTH = 460   # px — left panel width
+    CANVAS_W = 1000   # px — center panel minimum width
+    SEARCH_W = 280   # px — right panel width
+    WIN_H = 800
 
     LIST_COLUMNS = [
         ("case",     "Case",      58,  "center"),
@@ -165,14 +166,16 @@ class VitalDBBrowser:
         self.track_flags = track_flags
 
         # Waveform state
-        self._vf:   VitalFile | None = None
+        self._vf: VitalFile | None = None
         self._data: dict[str, np.ndarray] | None = None
         self._t0 = 0.0
         self._dur = 0.0
         self._wave_axes: list[plt.Axes] = []
-        self._num_ax:    plt.Axes | None = None
-        self._slider:    Slider | None = None
+        self._num_ax: plt.Axes | None = None
         self._time_text = None
+        self._bp_match_times: list[int] = []
+        self._current_bp_mode = "exact"
+        self._canvas_ready = False
 
         # Sorted row cache
         self._sort_col = "case"
@@ -220,27 +223,38 @@ class VitalDBBrowser:
     def _build_ui(self):
         self.root.title("VitalDB Browser")
         self.root.configure(bg="#f0f0f7")
-        self.root.geometry(f"{self.LIST_WIDTH + self.CANVAS_W}x{self.WIN_H}")
-        self.root.minsize(900, 500)
+        self.root.geometry(
+            f"{self.LIST_WIDTH + self.CANVAS_W + self.SEARCH_W}x{self.WIN_H}"
+        )
+        self.root.minsize(1180, 500)
 
-        # ── Top-level paned window ────────────────────────────────────────────
-        paned = tk.PanedWindow(self.root, orient="horizontal",
-                               bg="#f0f0f7", sashwidth=5, sashrelief="flat",
-                               handlesize=0)
-        paned.pack(fill="both", expand=True)
+        content = tk.Frame(self.root, bg="#f0f0f7")
+        content.pack(fill="both", expand=True)
+        content.grid_rowconfigure(0, weight=1)
+        content.grid_columnconfigure(0, weight=0, minsize=self.LIST_WIDTH)
+        content.grid_columnconfigure(1, weight=1, minsize=500)
+        content.grid_columnconfigure(2, weight=0, minsize=self.SEARCH_W)
 
         # ── Left panel ───────────────────────────────────────────────────────
-        left = tk.Frame(paned, bg="#f0f0f7", width=self.LIST_WIDTH)
-        left.pack_propagate(False)
-        paned.add(left, minsize=280)
+        left = tk.Frame(content, bg="#f0f0f7", width=self.LIST_WIDTH)
+        left.grid(row=0, column=0, sticky="nsew")
+        left.grid_propagate(False)
 
         self._build_list_panel(left)
 
-        # ── Right panel ──────────────────────────────────────────────────────
-        right = tk.Frame(paned, bg="#ffffff")
-        paned.add(right, minsize=500)
+        # ── Center panel ─────────────────────────────────────────────────────
+        center = tk.Frame(content, bg="#ffffff", width=self.CANVAS_W)
+        center.grid(row=0, column=1, sticky="nsew")
+        center.grid_propagate(False)
 
-        self._build_canvas_panel(right)
+        self._build_canvas_panel(center)
+
+        # ── Right panel ──────────────────────────────────────────────────────
+        right = tk.Frame(content, bg="#f6f6fb", width=self.SEARCH_W)
+        right.grid(row=0, column=2, sticky="nsew")
+        right.grid_propagate(False)
+
+        self._build_search_panel(right)
 
         # ── Bottom status bar ─────────────────────────────────────────────────
         bar = tk.Frame(self.root, bg="#e8e8f2", height=22)
@@ -315,7 +329,9 @@ class VitalDBBrowser:
             self._tree.tag_configure(tag, foreground=fg, background=bg)
 
         self._tree.bind("<<TreeviewSelect>>", self._on_case_select)
-        self._tree.bind("<Double-1>",         self._on_case_select)
+        self._tree.bind("<Double-1>", self._on_case_select)
+        self._tree.bind("<Up>", self._on_case_key_nav)
+        self._tree.bind("<Down>", self._on_case_key_nav)
 
         # List status
         self._list_status = tk.StringVar()
@@ -323,35 +339,108 @@ class VitalDBBrowser:
                  bg="#f0f0f7", fg="#888899",
                  font=("Segoe UI", 8), anchor="w").pack(fill="x", padx=8, pady=(0, 4))
 
-    # ── Right panel: matplotlib canvas ───────────────────────────────────────
+    # ── Center panel: matplotlib canvas ──────────────────────────────────────
 
     def _build_canvas_panel(self, parent: tk.Frame):
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_rowconfigure(1, weight=0)
+        parent.grid_columnconfigure(0, weight=1)
+
+        self._canvas_host = tk.Frame(parent, bg="#ffffff")
+        self._canvas_host.grid(row=0, column=0, sticky="nsew")
+        self._canvas_host.grid_rowconfigure(0, weight=1)
+        self._canvas_host.grid_columnconfigure(0, weight=1)
+
         # Placeholder shown before any case is selected
         self._placeholder = tk.Label(
-            parent,
+            self._canvas_host,
             text="← Select a case from the list",
             bg="#ffffff", fg="#aaaacc",
             font=("Segoe UI", 14),
         )
-        self._placeholder.pack(expand=True)
+        self._placeholder.grid(row=0, column=0, sticky="nsew")
 
         # Figure (hidden until a case is loaded)
         self._fig = plt.Figure(facecolor="#f0f0f7")
-        self._canvas = FigureCanvasTkAgg(self._fig, master=parent)
+        self._canvas = FigureCanvasTkAgg(self._fig, master=self._canvas_host)
         self._canvas_widget = self._canvas.get_tk_widget()
-        # Not packed yet — shown after first case load
+        # Not gridded yet — shown after first case load
 
         # Navigation bar below the canvas
-        self._nav_frame = tk.Frame(parent, bg="#f0f0f7")
-        # Also deferred
+        self._nav_frame = tk.Frame(parent, bg="#f0f0f7", height=52)
+        self._nav_frame.grid(row=1, column=0, sticky="ew")
+        self._nav_frame.grid_propagate(False)
+
+    # ── Right panel: SBP/DBP search ──────────────────────────────────────────
+
+    def _build_search_panel(self, parent: tk.Frame):
+        top = tk.Frame(parent, bg="#f6f6fb")
+        top.pack(fill="x", padx=10, pady=(10, 6))
+
+        tk.Label(top, text="SBP/DBP Search", bg="#f6f6fb", fg="#222233",
+                 font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Label(top, text="Current case only", bg="#f6f6fb", fg="#888899",
+                 font=("Segoe UI", 8)).pack(anchor="w", pady=(2, 0))
+
+        results = tk.Frame(parent, bg="#f6f6fb")
+        results.pack(fill="both", expand=True, padx=10, pady=(0, 8))
+
+        self._bp_results = tk.Listbox(
+            results,
+            bg="#ffffff", fg="#222233",
+            selectbackground="#2255cc", selectforeground="white",
+            relief="flat", activestyle="none",
+            font=("Consolas", 9),
+        )
+        self._bp_results.pack(side="left", fill="both", expand=True)
+        self._bp_results.bind("<<ListboxSelect>>", self._on_bp_result_select)
+        self._bp_results.bind("<Double-1>", self._on_bp_result_select)
+        self._bp_results.bind("<Return>", self._on_bp_result_select)
+
+        vsb = ttk.Scrollbar(results, orient="vertical",
+                            command=self._bp_results.yview)
+        self._bp_results.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+
+        self._bp_status = tk.StringVar(value="Enter SBP and DBP below.")
+        tk.Label(parent, textvariable=self._bp_status,
+                 bg="#f6f6fb", fg="#888899",
+                 font=("Segoe UI", 8), anchor="center", justify="center",
+                 wraplength=self.SEARCH_W - 24
+                 ).pack(fill="x", padx=10, pady=(0, 8))
+
+        bottom = tk.Frame(parent, bg="#eef0f8")
+        bottom.pack(fill="x", side="bottom", padx=10, pady=(0, 10))
+
+        tk.Label(bottom, text="SBP", bg="#eef0f8", fg="#555577",
+                 font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", padx=(10, 6), pady=(10, 4))
+        tk.Label(bottom, text="DBP", bg="#eef0f8", fg="#555577",
+                 font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", padx=(10, 6), pady=(4, 10))
+
+        self._sbp_var = tk.StringVar()
+        self._dbp_var = tk.StringVar()
+        self._sbp_var.trace_add("write", lambda *_: self._run_bp_search())
+        self._dbp_var.trace_add("write", lambda *_: self._run_bp_search())
+
+        entry_kw = dict(bg="#ffffff", fg="#222233", insertbackground="#222233",
+                        relief="flat", font=("Segoe UI", 9), width=10)
+        tk.Entry(bottom, textvariable=self._sbp_var, **entry_kw).grid(
+            row=0, column=1, sticky="ew", padx=(0, 10), pady=(10, 4)
+        )
+        tk.Entry(bottom, textvariable=self._dbp_var, **entry_kw).grid(
+            row=1, column=1, sticky="ew", padx=(0, 10), pady=(4, 10)
+        )
+        bottom.grid_columnconfigure(1, weight=1)
 
     def _show_canvas(self):
         """Swap placeholder for the matplotlib canvas on first load."""
+        if self._canvas_ready:
+            return
         if self._placeholder.winfo_ismapped():
-            self._placeholder.pack_forget()
-            self._canvas_widget.pack(fill="both", expand=True)
-            self._nav_frame.pack(fill="x")
-            self._build_nav_bar(self._nav_frame)
+            self._placeholder.grid_remove()
+        self._canvas_widget.grid(row=0, column=0, sticky="nsew")
+        self._build_nav_bar(self._nav_frame)
+        self._canvas_ready = True
 
     def _build_nav_bar(self, parent: tk.Frame):
         bc = "#d0d8f0"
@@ -453,6 +542,9 @@ class VitalDBBrowser:
         self._sort_col = col
         self._refresh_list()
 
+    def _on_case_key_nav(self, event=None):
+        self.root.after_idle(self._on_case_select)
+
     # ── Case loading ──────────────────────────────────────────────────────────
 
     def _on_case_select(self, event=None):
@@ -487,6 +579,7 @@ class VitalDBBrowser:
 
         self._show_canvas()
         self._rebuild_figure()
+        self._run_bp_search()
 
         dur_m, dur_s = int(self._dur) // 60, int(self._dur) % 60
         self._set_status(
@@ -638,16 +731,98 @@ class VitalDBBrowser:
 
         self._canvas.draw_idle()
 
+    # ── BP search ────────────────────────────────────────────────────────────
+
+    def _parse_bp_value(self, text: str) -> int | None:
+        text = text.strip()
+        if not text:
+            return None
+        return int(round(float(text)))
+
+    def _bp_values_are_integral(self, values: np.ndarray) -> bool:
+        valid = values[~np.isnan(values)]
+        return bool(valid.size == 0 or np.allclose(valid, np.round(valid)))
+
+    def _format_time_row(self, sec: int, sbp: int, dbp: int) -> str:
+        return f"{sec//3600:02d}:{(sec%3600)//60:02d}:{sec%60:02d} ({sec}s)   {sbp:>3}/{dbp:<3}"
+
+    def _run_bp_search(self):
+        if not hasattr(self, "_bp_results"):
+            return
+
+        self._bp_results.delete(0, tk.END)
+        self._bp_match_times = []
+        self._current_bp_mode = "exact"
+
+        try:
+            sbp = self._parse_bp_value(self._sbp_var.get())
+            dbp = self._parse_bp_value(self._dbp_var.get())
+        except ValueError:
+            self._bp_status.set("SBP and DBP must be numeric.")
+            return
+
+        if sbp is None or dbp is None:
+            self._bp_status.set("Enter SBP and DBP below.")
+            return
+
+        if self._data is None:
+            self._bp_status.set("Load a case to search within it.")
+            return
+
+        if "Solar8000/ART_SBP" not in self._data or "Solar8000/ART_DBP" not in self._data:
+            self._bp_status.set("This case does not contain numeric SBP/DBP tracks.")
+            return
+
+        sbp_arr = self._data["Solar8000/ART_SBP"]
+        dbp_arr = self._data["Solar8000/ART_DBP"]
+        n = min(len(sbp_arr), len(dbp_arr))
+        sbp_arr = sbp_arr[:n]
+        dbp_arr = dbp_arr[:n]
+
+        sbp_integral = self._bp_values_are_integral(sbp_arr)
+        dbp_integral = self._bp_values_are_integral(dbp_arr)
+        self._current_bp_mode = "exact" if sbp_integral and dbp_integral else "rounded"
+
+        if self._current_bp_mode == "exact":
+            match_mask = (sbp_arr == sbp) & (dbp_arr == dbp)
+        else:
+            match_mask = (np.round(sbp_arr) == sbp) & (np.round(dbp_arr) == dbp)
+        match_mask &= ~np.isnan(sbp_arr) & ~np.isnan(dbp_arr)
+
+        matches = np.flatnonzero(match_mask)
+        self._bp_match_times = matches.astype(int).tolist()
+        for t in self._bp_match_times:
+            self._bp_results.insert(tk.END, self._format_time_row(t, sbp, dbp))
+
+        self._bp_status.set(
+            f"{len(self._bp_match_times)} matches for SBP {sbp} / DBP {dbp} ({self._current_bp_mode})"
+        )
+
+    def _on_bp_result_select(self, event=None):
+        sel = self._bp_results.curselection()
+        if not sel:
+            return
+        idx = sel[0]
+        if 0 <= idx < len(self._bp_match_times):
+            self._set_time(self._bp_match_times[idx], center=True)
+
     # ── Navigation ────────────────────────────────────────────────────────────
+
+    def _set_time(self, t0: float, *, center: bool = False):
+        if self._data is None:
+            return
+
+        if center:
+            t0 = float(t0) - (WINDOW_SEC / 2)
+        self._t0 = float(np.clip(t0, 0, max(self._dur - WINDOW_SEC, 0)))
+        if hasattr(self, "_tk_slider"):
+            self._tk_slider.set(int(self._t0))
+        self._draw()
 
     def _shift(self, delta: float):
         if self._data is None:
             return
-        self._t0 = float(np.clip(self._t0 + delta, 0,
-                                 max(self._dur - WINDOW_SEC, 0)))
-        if hasattr(self, "_tk_slider"):
-            self._tk_slider.set(int(self._t0))
-        self._draw()
+        self._set_time(self._t0 + delta)
 
     def _on_tk_slider(self, val):
         if self._data is None:

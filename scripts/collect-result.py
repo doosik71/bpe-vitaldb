@@ -42,14 +42,14 @@ def parse_args() -> argparse.Namespace:
         "--logs-dir", type=Path, default=Path("logs"),
         help="Output directory for eval_results.json and metrics.csv (default: logs)",
     )
-    p.add_argument(
-        "--pt-dir", type=Path, default=Path("models"),
-        help="Output directory for best.pt model files (default: models)",
-    )
+    # p.add_argument(
+    #     "--pt-dir", type=Path, default=Path("models"),
+    #     help="Output directory for best.pt model files (default: models)",
+    # )
     return p.parse_args()
 
 
-def collect(models_dir: Path, images_dir: Path, logs_dir: Path, pt_dir: Path) -> None:
+def collect(models_dir: Path, images_dir: Path, logs_dir: Path) -> None:
     if not models_dir.exists():
         print(f"Models directory not found: {models_dir}")
         return
@@ -88,20 +88,20 @@ def collect(models_dir: Path, images_dir: Path, logs_dir: Path, pt_dir: Path) ->
             print(f"  {src}  →  {dest}")
             copied += 1
 
-        src = model_dir / "best.pt"
-        if src.exists():
-            pt_dir.mkdir(parents=True, exist_ok=True)
-            dest = pt_dir / f"{model_name}.pt"
-            shutil.copy2(src, dest)
-            print(f"  {src}  →  {dest}")
-            copied += 1
+        # src = model_dir / "best.pt"
+        # if src.exists():
+        #     pt_dir.mkdir(parents=True, exist_ok=True)
+        #     dest = pt_dir / f"{model_name}.pt"
+        #     shutil.copy2(src, dest)
+        #     print(f"  {src}  →  {dest}")
+        #     copied += 1
 
     print(f"\n{copied} file(s) copied.")
 
 
 def main() -> None:
     args = parse_args()
-    collect(args.models_dir, args.images_dir, args.logs_dir, args.pt_dir)
+    collect(args.models_dir, args.images_dir, args.logs_dir)
 
 
 if __name__ == "__main__":
