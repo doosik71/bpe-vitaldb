@@ -107,6 +107,7 @@ bin/eval-model data/models/resnet1d_mini
 bin/eval-model data/models/resnet1d_tiny
 bin/eval-model data/models/st_resnet
 bin/eval-model data/models/xresnet1d
+
 bin/eval-model-pulsewoq data/models/pulsewoq_resnet1d
 ```
 

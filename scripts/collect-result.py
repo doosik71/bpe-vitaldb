@@ -4,13 +4,15 @@ Collect result files from all model directories.
 Scans data/models/<model>/ and copies files from each model directory.
 
 Files collected:
-  loss_graph.png    → images/loss_graph/<model>.png
-  mae_graph.png     → images/mae_graph/<model>.png
-  error_hist.png    → images/error_hist/<model>.png
-  eval_plot.png     → images/eval_plot/<model>.png
-  eval_results.json → logs/eval_results/<model>.json
-  metrics.csv       → logs/metrics/<model>.csv
-  best.pt           → models/<model>.pt
+  loss_graph.png             → images/loss_graph/<model>.png
+  mae_graph.png              → images/mae_graph/<model>.png
+  error_hist.png             → images/error_hist/<model>.png
+  eval_plot.png              → images/eval_plot/<model>.png
+  bland_altman.png           → images/bland_altman/<model>.png
+  bland_altman_all.png       → images/bland_altman_all/<model>.png
+  bland_altman_accepted.png  → images/bland_altman_accepted/<model>.png
+  eval_results.json          → logs/eval_results/<model>.json
+  metrics.csv                → logs/metrics/<model>.csv
 
 Usage:
     uv run python scripts/collect-result.py
@@ -21,7 +23,15 @@ import argparse
 import shutil
 from pathlib import Path
 
-GRAPH_NAMES = ["loss_graph.png", "mae_graph.png", "error_hist.png", "eval_plot.png"]
+GRAPH_NAMES = [
+    "loss_graph.png",
+    "mae_graph.png",
+    "error_hist.png",
+    "eval_plot.png",
+    "bland_altman.png",
+    "bland_altman_all.png",
+    "bland_altman_accepted.png",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,10 +52,6 @@ def parse_args() -> argparse.Namespace:
         "--logs-dir", type=Path, default=Path("logs"),
         help="Output directory for eval_results.json and metrics.csv (default: logs)",
     )
-    # p.add_argument(
-    #     "--pt-dir", type=Path, default=Path("models"),
-    #     help="Output directory for best.pt model files (default: models)",
-    # )
     return p.parse_args()
 
 
@@ -87,14 +93,6 @@ def collect(models_dir: Path, images_dir: Path, logs_dir: Path) -> None:
             shutil.copy2(src, dest)
             print(f"  {src}  →  {dest}")
             copied += 1
-
-        # src = model_dir / "best.pt"
-        # if src.exists():
-        #     pt_dir.mkdir(parents=True, exist_ok=True)
-        #     dest = pt_dir / f"{model_name}.pt"
-        #     shutil.copy2(src, dest)
-        #     print(f"  {src}  →  {dest}")
-        #     copied += 1
 
     print(f"\n{copied} file(s) copied.")
 

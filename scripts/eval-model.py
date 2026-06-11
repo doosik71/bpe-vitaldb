@@ -4,9 +4,10 @@ Evaluate a trained BPE model on the held-out test set.
 Loads best.pt from a run directory, runs inference over the test split, and
 writes evaluation results to the same directory:
 
-  eval_results.json   — summary metrics (MAE, RMSE, ME, SD; BHS grade; AAMI)
-  eval_plot.png       — predicted vs actual scatter plots for SBP and DBP
-  error_hist.png      — error distribution histograms for SBP and DBP
+  eval_results.json     — summary metrics (MAE, RMSE, ME, SD; BHS grade; AAMI)
+  eval_plot.png         — predicted vs actual scatter plots for SBP and DBP
+  error_hist.png        — error distribution histograms for SBP and DBP
+  bland_altman.png      — Bland-Altman plots for SBP and DBP
 
 Usage:
     uv run python scripts/eval-model.py <run_dir> [OPTIONS]
@@ -200,6 +201,46 @@ def plot_error_hist(
         ax.set_title(f"{label} Error Distribution")
         ax.legend(fontsize=9)
         ax.grid(True, alpha=0.3, axis="y")
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_bland_altman(
+    pred_sbp: np.ndarray,
+    true_sbp: np.ndarray,
+    pred_dbp: np.ndarray,
+    true_dbp: np.ndarray,
+    out_path: Path,
+) -> None:
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    for ax, pred, true, label in [
+        (axes[0], pred_sbp, true_sbp, "SBP"),
+        (axes[1], pred_dbp, true_dbp, "DBP"),
+    ]:
+        mean_vals = (pred + true) / 2.0
+        diff_vals = pred - true
+
+        me = float(np.mean(diff_vals))
+        sd = float(np.std(diff_vals, ddof=1))
+        loa_upper = me + 1.96 * sd
+        loa_lower = me - 1.96 * sd
+
+        ax.scatter(mean_vals, diff_vals, alpha=0.15, s=4, color="#2196F3", rasterized=True)
+        ax.axhline(0,         color="black",   linewidth=0.8, linestyle=":")
+        ax.axhline(me,        color="#F44336", linewidth=1.5, linestyle="-",
+                   label=f"Bias = {me:.2f} mmHg")
+        ax.axhline(loa_upper, color="#FF9800", linewidth=1.2, linestyle="--",
+                   label=f"+1.96 SD = {loa_upper:.2f} mmHg")
+        ax.axhline(loa_lower, color="#FF9800", linewidth=1.2, linestyle="--",
+                   label=f"−1.96 SD = {loa_lower:.2f} mmHg")
+        ax.set_xlabel(f"Mean of Actual and Predicted {label} (mmHg)")
+        ax.set_ylabel(f"Predicted − Actual {label} (mmHg)")
+        ax.set_title(f"{label}: Bland-Altman Plot")
+        ax.legend(fontsize=8)
+        ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
@@ -514,6 +555,10 @@ def _main_single(args: argparse.Namespace) -> None:
                     run_dir / "error_hist.png")
     print(f"Saved: {run_dir / 'error_hist.png'}")
 
+    ba_path = run_dir / "bland_altman.png"
+    plot_bland_altman(preds[:, 0], targets[:, 0], preds[:, 1], targets[:, 1], ba_path)
+    print(f"Saved: {ba_path}")
+
 
 def _main_duo(args: argparse.Namespace) -> None:
     """Duo evaluation: two-model ensemble with disagreement-based rejection."""
@@ -692,6 +737,11 @@ def _main_duo(args: argparse.Namespace) -> None:
                     out_dir / "error_hist_all.png")
     print(f"Saved: {out_dir / 'error_hist_all.png'}")
 
+    ba_all_path = out_dir / "bland_altman_all.png"
+    plot_bland_altman(avg_preds[:, 0], targets[:, 0], avg_preds[:, 1], targets[:, 1],
+                      ba_all_path)
+    print(f"Saved: {ba_all_path}")
+
     if n_accepted > 0:
         acc_p, acc_t = avg_preds[accepted], targets[accepted]
         plot_scatter(acc_p[:, 0], acc_t[:, 0], acc_p[:, 1], acc_t[:, 1],
@@ -705,6 +755,11 @@ def _main_duo(args: argparse.Namespace) -> None:
         # Disagreement distribution plot
         _plot_duo_diff(diff, accepted, threshold, out_dir / "diff_dist.png")
         print(f"Saved: {out_dir / 'diff_dist.png'}")
+
+        ba_acc_path = out_dir / "bland_altman_accepted.png"
+        plot_bland_altman(acc_p[:, 0], acc_t[:, 0], acc_p[:, 1], acc_t[:, 1],
+                          ba_acc_path)
+        print(f"Saved: {ba_acc_path}")
 
 
 def _plot_duo_diff(
