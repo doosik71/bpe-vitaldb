@@ -16,7 +16,7 @@ Options:
     --batch-size         Mini-batch size               (default: 256)
     --lr                 Initial learning rate         (default: 1e-3)
     --weight-decay       AdamW weight decay            (default: 1e-4)
-    --patience           Early-stopping patience       (default: 15)
+    --patience           Early-stopping patience       (default: 5)
     --seed               Random seed                   (default: 42)
     --device             auto | cpu | cuda | cuda:N    (default: auto)
     --workers            DataLoader worker processes   (default: 4)
@@ -104,8 +104,8 @@ def parse_args() -> argparse.Namespace:
         help="AdamW weight decay (default: 1e-4)",
     )
     p.add_argument(
-        "--patience", type=int, default=15,
-        help="Early-stopping patience in epochs (default: 15)",
+        "--patience", type=int, default=5,
+        help="Early-stopping patience in epochs (default: 5)",
     )
     p.add_argument(
         "--seed", type=int, default=42,

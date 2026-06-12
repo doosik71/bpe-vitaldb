@@ -4,8 +4,6 @@
 관련 코드: [scripts/train-model.py](../scripts/train-model.py)  
 관련 문서: [README.md](../README.md), [docs/data-augmentation.md](data-augmentation.md)
 
----
-
 ## 1. 목적
 
 `scripts/train-model.py`는 VitalDB NPZ 데이터셋으로 혈압 추정(BPE) 딥러닝 모델을 학습하는
@@ -20,8 +18,6 @@
 - 검증 손실 기준 최적 체크포인트(`best.pt`)와 마지막 체크포인트(`last.pt`)를 저장한다.
 - 에폭별 손실/MAE를 `metrics.csv`에 기록한다.
 - Early stopping으로 과적합을 방지한다.
-
----
 
 ## 2. 사용 방법
 
@@ -60,8 +56,6 @@ uv run python scripts/train-model.py --model resnet1d --no-aug-noise --no-aug-ma
 uv run python scripts/train-model.py --model xresnet1d --device cuda:0
 ```
 
----
-
 ## 3. CLI 옵션
 
 ### 필수
@@ -86,7 +80,7 @@ uv run python scripts/train-model.py --model xresnet1d --device cuda:0
 | `--batch-size`   | `256`  | 미니배치 크기                  |
 | `--lr`           | `1e-3` | 초기 학습률                    |
 | `--weight-decay` | `1e-4` | AdamW weight decay             |
-| `--patience`     | `15`   | Early stopping patience (에폭) |
+| `--patience`     | `5`    | Early stopping patience (에폭) |
 | `--seed`         | `42`   | 난수 시드                      |
 
 ### 시스템
@@ -112,8 +106,6 @@ uv run python scripts/train-model.py --model xresnet1d --device cuda:0
 | 옵션                   | 설명                                                          |
 | ---------------------- | ------------------------------------------------------------- |
 | `--no-patient-balance` | WeightedRandomSampler 비활성화. 기본적으로 케이스당 균등 기여 |
-
----
 
 ## 4. 출력 파일
 
@@ -145,8 +137,6 @@ uv run python scripts/train-model.py --model xresnet1d --device cuda:0
 ```text
 epoch, train_loss, val_loss, train_sbp_mae, train_dbp_mae, val_sbp_mae, val_dbp_mae, lr
 ```
-
----
 
 ## 5. 상세 설계
 
@@ -311,8 +301,6 @@ start_epoch = ckpt.get("epoch", 0)
 
 같은 모델을 여러 번 실행하면 줄이 누적되어 하이퍼파라미터 탐색 이력이 남는다.
 
----
-
 ## 6. 학습 결과 확인
 
 학습 중 또는 완료 후 손실/MAE 그래프를 확인하려면 `train-status.py`를 사용한다.
@@ -328,8 +316,6 @@ bin\train-status.bat data\models\resnet1d   # Windows
 bin/eval-model     data/models/resnet1d   # Linux / macOS
 bin\eval-model.bat data\models\resnet1d   # Windows
 ```
-
----
 
 ## 7. 관련 모듈
 

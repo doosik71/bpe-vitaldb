@@ -30,6 +30,8 @@ bin/train-model --model resnet1d_mini
 bin/train-model --model resnet1d_tiny
 bin/train-model --model st_resnet
 bin/train-model --model xresnet1d
+
+bin/train-all-model --dataset-dir data/dataset-v1 --output-dir data/models-v1
 ```
 
 ## 모델 구조 출력
