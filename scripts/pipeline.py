@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-bpe-gui.py — GUI launcher for the BPE-VitalDB experiment pipeline.
+pipeline.py - GUI launcher for the BPE-VitalDB experiment pipeline.
 
 Provides a visual pipeline overview, per-step parameter forms, and a live
 output console.  All scripts are run via 'uv run python <script>'.
@@ -62,16 +62,16 @@ def get_device_choices_with_blank() -> list[str]:
         devices.extend(f"cuda:{i}" for i in range(NUM_GPUS))
     return devices
 
-# ─── Pipeline definition ──────────────────────────────────────────────────────
+# --- Pipeline definition ------------------------------------------------------
 # Each param tuple: (flag, widget_type, default, help_text [, choices])
-#   widget_type: "entry"       — text; multiple space-separated tokens → multi-arg
-#                "int"/"float" — text, single value
-#                "bool"        — checkbox; adds --flag when checked
-#                "dir"         — text + directory-browse button
-#                "file"        — text + file-browse button
-#                "positional_dir" — positional arg (no --flag prefix) + browse
-#                "combo"       — readonly dropdown
-#                "combo_free"  — editable dropdown
+#   widget_type: "entry"       - text; multiple space-separated tokens -> multi-arg
+#                "int"/"float" - text, single value
+#                "bool"        - checkbox; adds --flag when checked
+#                "dir"         - text + directory-browse button
+#                "file"        - text + file-browse button
+#                "positional_dir" - positional arg (no --flag prefix) + browse
+#                "combo"       - readonly dropdown
+#                "combo_free"  - editable dropdown
 
 PIPELINE = [
     {
@@ -342,17 +342,17 @@ PIPELINE = [
     },
 ]
 
-# ─── Status display helpers ──────────────────────────────────────────────────
-_SYM = {"idle": "○", "running": "◉", "done": "●", "error": "✕"}
+# --- Status display helpers --------------------------------------------------
+_SYM = {"idle": ".", "running": "*", "done": "o", "error": "ERROR:"}
 _CLR = {"idle": "#777788", "running": "#00BFFF", "done": "#4DB870", "error": "#FF5555"}
 
 
-# ─── Application ─────────────────────────────────────────────────────────────
+# --- Application -------------------------------------------------------------
 
 class BPEApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("BPE-VitalDB  —  Blood Pressure Estimation Pipeline")
+        self.title("BPE-VitalDB  -  Blood Pressure Estimation Pipeline")
         self.geometry("1320x900")
         self.minsize(1000, 660)
 
@@ -375,7 +375,7 @@ class BPEApp(tk.Tk):
         self._select_step(PIPELINE[0]["id"])
         self.after(100, self._poll_q)
 
-    # ── UI construction ───────────────────────────────────────────────────────
+    # -- UI construction -------------------------------------------------------
 
     def _build_ui(self) -> None:
         style = ttk.Style(self)
@@ -401,7 +401,7 @@ class BPEApp(tk.Tk):
         h = ttk.PanedWindow(self, orient="horizontal")
         h.pack(fill="both", expand=True)
 
-        # ── Sidebar ──────────────────────────────────────────────────────────
+        # -- Sidebar ----------------------------------------------------------
         sidebar = tk.Frame(h, bg="#23243a", width=240)
         sidebar.pack_propagate(False)
         h.add(sidebar, weight=0)
@@ -433,7 +433,7 @@ class BPEApp(tk.Tk):
 
         self._populate_sidebar()
 
-        # ── Right pane ────────────────────────────────────────────────────────
+        # -- Right pane --------------------------------------------------------
         v = ttk.PanedWindow(h, orient="vertical")
         h.add(v, weight=1)
 
@@ -477,7 +477,7 @@ class BPEApp(tk.Tk):
             row = tk.Frame(self._steps_inner, bg="#23243a", cursor="hand2")
             row.pack(fill="x", padx=6, pady=1)
 
-            status_lbl = tk.Label(row, text="○",
+            status_lbl = tk.Label(row, text=".",
                                   font=("TkDefaultFont", 11),
                                   bg="#23243a", fg="#666677", width=2)
             status_lbl.pack(side="left", padx=(4, 0))
@@ -507,7 +507,7 @@ class BPEApp(tk.Tk):
         row.config(bg=bg)
         text_lbl.config(bg=bg)
 
-    # ── Step selection ────────────────────────────────────────────────────────
+    # -- Step selection --------------------------------------------------------
 
     def _select_step(self, step_id: str) -> None:
         if self._selected_id and self._selected_id in self._sw:
@@ -524,7 +524,7 @@ class BPEApp(tk.Tk):
 
         self._build_config(self._step_map[step_id])
 
-    # ── Config panel ──────────────────────────────────────────────────────────
+    # -- Config panel ----------------------------------------------------------
 
     def _build_config(self, step: dict) -> None:
         for w in self._config_outer.winfo_children():
@@ -574,13 +574,13 @@ class BPEApp(tk.Tk):
         act = ttk.Frame(self._config_outer)
         act.pack(fill="x", padx=16, pady=10)
 
-        run_label = "▶  Launch" if step.get("gui") else "▶  Run"
+        run_label = "Launch" if step.get("gui") else "Run"
         self._run_btn = ttk.Button(act, text=run_label, style="Run.TButton",
                                    command=lambda s=step: self._run(s))
         self._run_btn.pack(side="left", padx=(0, 10))
 
         if not step.get("gui"):
-            self._stop_btn = ttk.Button(act, text="⏹  Stop",
+            self._stop_btn = ttk.Button(act, text="Stop",
                                         command=self._stop)
             self._stop_btn.pack(side="left")
 
@@ -616,7 +616,7 @@ class BPEApp(tk.Tk):
             ttk.Entry(frame, textvariable=var, width=52).grid(
                 row=row, column=1, sticky="ew", pady=3)
             browse = self._browse_file if wtype == "file" else self._browse_dir
-            ttk.Button(frame, text="…", width=3,
+            ttk.Button(frame, text="...", width=3,
                        command=lambda v=var: browse(v)).grid(
                            row=row, column=2, padx=(4, 0), pady=3)
 
@@ -641,7 +641,7 @@ class BPEApp(tk.Tk):
 
         self._param_vars[flag] = (var, wtype)
 
-    # ── File / directory browsing ─────────────────────────────────────────────
+    # -- File / directory browsing ---------------------------------------------
 
     def _browse_dir(self, var: tk.StringVar) -> None:
         cur = var.get()
@@ -659,7 +659,7 @@ class BPEApp(tk.Tk):
         if f:
             var.set(f)
 
-    # ── Command building ─────────────────────────────────────────────────────
+    # -- Command building -----------------------------------------------------
 
     def _build_cmd(self, step: dict) -> list:
         script = str(SCRIPTS / step["script"])
@@ -694,19 +694,19 @@ class BPEApp(tk.Tk):
 
         return cmd + positionals + kwargs
 
-    # ── Running steps ─────────────────────────────────────────────────────────
+    # -- Running steps ---------------------------------------------------------
 
     def _run(self, step: dict) -> None:
         if self._running_id is not None:
-            self._log("⚠  Another process is still running.  Stop it first.", "err")
+            self._log("WARNING:  Another process is still running.  Stop it first.", "err")
             return
 
         cmd = self._build_cmd(step)
 
-        self._log(f"\n{'─' * 68}", "ts")
-        self._log(f"▶  {step['label']}", "info")
+        self._log(f"\n{'-' * 68}", "ts")
+        self._log(f"{step['label']}", "info")
         self._log("   " + " ".join(cmd), "cmd")
-        self._log(f"{'─' * 68}", "ts")
+        self._log(f"{'-' * 68}", "ts")
 
         # GUI apps: launch and do not track stdout
         if step.get("gui"):
@@ -752,16 +752,11 @@ class BPEApp(tk.Tk):
                     self._out_q.put(("line", buf))
                     buf = ""
                 elif ch == "\r":
-                    # Peek at next byte to distinguish \r\n from lone \r.
-                    raw2 = stdout.read(1)  # type: ignore[union-attr]
-                    if raw2 == b"\n" or not raw2:
-                        # Windows line ending or \r at EOF → treat as newline.
-                        self._out_q.put(("line", buf))
-                        buf = ""
-                    else:
-                        # Lone \r (tqdm carriage-return update).
-                        self._out_q.put(("cr", buf))
-                        buf = raw2.decode("utf-8", errors="replace")
+                    # Treat carriage return like a newline in the GUI console.
+                    # This gives up in-place tqdm rendering, but keeps output
+                    # readable in Tk and avoids broken line-boundary display.
+                    self._out_q.put(("line", buf))
+                    buf = ""
                 else:
                     buf += ch
             if buf:
@@ -775,32 +770,51 @@ class BPEApp(tk.Tk):
         if self._process and self._process.poll() is None:
             self._process.terminate()
 
-    # ── Output polling ────────────────────────────────────────────────────────
+    # -- Output polling --------------------------------------------------------
 
     def _poll_q(self) -> None:
+        # Limit per-tick console work so heavy tqdm-style output does not starve
+        # the Tk event loop and freeze button / keyboard / mouse handling.
+        max_items = 200
+        processed = 0
+        latest_cr: str | None = None
+
         try:
-            while True:
+            while processed < max_items:
                 item = self._out_q.get_nowait()
+                processed += 1
                 if item[0] == "line":
+                    if latest_cr is not None:
+                        self._log(latest_cr)
+                        latest_cr = None
                     self._log(item[1])
                 elif item[0] == "cr":
-                    self._log_cr(item[1])
+                    # Coalesce repeated carriage-return progress updates and only
+                    # render the newest one on this Tk tick.
+                    latest_cr = item[1]
                 elif item[0] == "done":
+                    if latest_cr is not None:
+                        self._log(latest_cr)
+                        latest_cr = None
                     _, sid, rc = item
                     if rc == 0:
-                        self._log("✓  Completed successfully (exit 0).", "ok")
+                        self._log("OK:  Completed successfully (exit 0).", "ok")
                         self._set_status(sid, "done")
                     else:
-                        self._log(f"✕  Exited with code {rc}.", "err")
+                        self._log(f"ERROR:  Exited with code {rc}.", "err")
                         self._set_status(sid, "error")
                     self._running_id = None
-                    self._process    = None
+                    self._process = None
                     self._sync_buttons()
         except queue.Empty:
             pass
+
+        if latest_cr is not None:
+            self._log_cr(latest_cr)
+
         self.after(100, self._poll_q)
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
+    # -- Helpers ---------------------------------------------------------------
 
     def _sync_buttons(self) -> None:
         is_running = self._running_id is not None
@@ -812,7 +826,7 @@ class BPEApp(tk.Tk):
             if is_running:
                 sid = self._running_id
                 name = self._step_map[sid]["label"] if sid else ""
-                self._status_lbl.config(text=f"Running: {name}…",
+                self._status_lbl.config(text=f"Running: {name}...",
                                         foreground="#00BFFF")
             else:
                 self._status_lbl.config(text="", foreground="#888899")
@@ -850,7 +864,7 @@ class BPEApp(tk.Tk):
             sl.config(text=_SYM[status], fg=_CLR[status])
 
 
-# ─── Entry point ─────────────────────────────────────────────────────────────
+# --- Entry point -------------------------------------------------------------
 
 if __name__ == "__main__":
     app = BPEApp()

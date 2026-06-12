@@ -10,8 +10,8 @@ Also produces a single inference-time graph:
   y-axis: average inference time per sample (ms/sample)
 
 Data sources:
-  data/models/<model>/struct.txt           — trainable parameter count
-  data/models/<model>/eval_results.json    — metric values + inference time
+  data/models/<model>/struct.txt           - trainable parameter count
+  data/models/<model>/eval_results.json    - metric values + inference time
 
 Output:
   images/plot_mae.png / images/plot_mae.html

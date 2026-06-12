@@ -4,15 +4,15 @@ Collect result files from all model directories.
 Scans data/models/<model>/ and copies files from each model directory.
 
 Files collected:
-  loss_graph.png             → images/loss_graph/<model>.png
-  mae_graph.png              → images/mae_graph/<model>.png
-  error_hist.png             → images/error_hist/<model>.png
-  eval_plot.png              → images/eval_plot/<model>.png
-  bland_altman.png           → images/bland_altman/<model>.png
-  bland_altman_all.png       → images/bland_altman_all/<model>.png
-  bland_altman_accepted.png  → images/bland_altman_accepted/<model>.png
-  eval_results.json          → logs/eval_results/<model>.json
-  metrics.csv                → logs/metrics/<model>.csv
+  loss_graph.png             -> images/loss_graph/<model>.png
+  mae_graph.png              -> images/mae_graph/<model>.png
+  error_hist.png             -> images/error_hist/<model>.png
+  eval_plot.png              -> images/eval_plot/<model>.png
+  bland_altman.png           -> images/bland_altman/<model>.png
+  bland_altman_all.png       -> images/bland_altman_all/<model>.png
+  bland_altman_accepted.png  -> images/bland_altman_accepted/<model>.png
+  eval_results.json          -> logs/eval_results/<model>.json
+  metrics.csv                -> logs/metrics/<model>.csv
 
 Usage:
     uv run python scripts/collect-result.py
@@ -78,7 +78,7 @@ def collect(models_dir: Path, images_dir: Path, logs_dir: Path) -> None:
             dest_dir.mkdir(parents=True, exist_ok=True)
             dest = dest_dir / f"{model_name}.png"
             shutil.copy2(src, dest)
-            print(f"  {src}  →  {dest}")
+            print(f"  {src}  ->  {dest}")
             copied += 1
 
         for src_name, dest_subdir, dest_ext in [
@@ -91,7 +91,7 @@ def collect(models_dir: Path, images_dir: Path, logs_dir: Path) -> None:
             dest_subdir.mkdir(parents=True, exist_ok=True)
             dest = dest_subdir / f"{model_name}{dest_ext}"
             shutil.copy2(src, dest)
-            print(f"  {src}  →  {dest}")
+            print(f"  {src}  ->  {dest}")
             copied += 1
 
     print(f"\n{copied} file(s) copied.")

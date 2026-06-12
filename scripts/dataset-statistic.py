@@ -11,14 +11,14 @@ BP statistics and per-case segment-count distributions, then writes:
 
 Purpose
 -------
-* bp_distribution.png   — check whether BP values are evenly distributed
+* bp_distribution.png   - check whether BP values are evenly distributed
                           across train / val / test
-* segments_per_case.png — spot whether a small number of patients dominates
+* segments_per_case.png - spot whether a small number of patients dominates
                           one split (data concentration check)
-* sd_per_case.png       — within-patient SBP/DBP variability; used to assess
+* sd_per_case.png       - within-patient SBP/DBP variability; used to assess
                           whether calibration-based methods truly improve over
                           simply predicting the patient-level mean
-* statistic.json        — machine-readable numbers for downstream analysis
+* statistic.json        - machine-readable numbers for downstream analysis
 
 Usage:
     uv run python scripts/dataset-statistic.py [OPTIONS]
@@ -55,7 +55,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-# ── Data loading ──────────────────────────────────────────────────────────────
+# -- Data loading --------------------------------------------------------------
 
 def load_split(split_dir: Path) -> dict:
     """Load BP labels (y) from all NPZ files in a split directory."""
@@ -91,7 +91,7 @@ def load_split(split_dir: Path) -> dict:
     }
 
 
-# ── Statistics helpers ────────────────────────────────────────────────────────
+# -- Statistics helpers --------------------------------------------------------
 
 def _bp_stats(arr: np.ndarray) -> dict:
     return {
@@ -131,7 +131,7 @@ def _seg_stats(counts: np.ndarray, case_ids: list[str]) -> dict:
     }
 
 
-# ── Plots ─────────────────────────────────────────────────────────────────────
+# -- Plots ---------------------------------------------------------------------
 
 def plot_bp_distribution(raw: dict[str, dict], out_path: Path) -> None:
     """Overlaid SBP / DBP density histograms for train / val / test."""
@@ -174,7 +174,7 @@ def plot_segments_per_case(raw: dict[str, dict], out_path: Path) -> None:
     fig, axes = plt.subplots(1, len(present), figsize=(6 * len(present), 5))
     if len(present) == 1:
         axes = [axes]
-    fig.suptitle("Segments per Case — Concentration Check", fontsize=13)
+    fig.suptitle("Segments per Case - Concentration Check", fontsize=13)
 
     for ax, split in zip(axes, present):
         counts = raw[split]["seg_counts"]
@@ -208,7 +208,7 @@ def plot_segments_per_case(raw: dict[str, dict], out_path: Path) -> None:
         ax.set_ylabel("Number of cases")
         ax.set_title(
             f"{split.capitalize()}  "
-            f"({len(counts):,} cases · {n_total:,} segments)"
+            f"({len(counts):,} cases | {n_total:,} segments)"
         )
         ax.legend(fontsize=8)
         ax.grid(True, alpha=0.3, axis="y")
@@ -219,7 +219,7 @@ def plot_segments_per_case(raw: dict[str, dict], out_path: Path) -> None:
 
 
 def plot_sd_per_case(raw: dict[str, dict], out_path: Path) -> None:
-    """Per-case SBP/DBP SD sorted ascending — within-patient variability plot.
+    """Per-case SBP/DBP SD sorted ascending - within-patient variability plot.
 
     Each dot is one patient (case).  The x-axis is the rank by SD (ascending);
     the y-axis is the SD in mmHg.  Colours distinguish train / val / test.
@@ -250,7 +250,7 @@ def plot_sd_per_case(raw: dict[str, dict], out_path: Path) -> None:
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     fig.suptitle(
         "Within-Patient BP Variability (SD per Case)\n"
-        "— sorted ascending; useful for assessing calibration-method baselines —",
+        "- sorted ascending; useful for assessing calibration-method baselines -",
         fontsize=12,
     )
 
@@ -287,7 +287,7 @@ def plot_sd_per_case(raw: dict[str, dict], out_path: Path) -> None:
         )
 
         # annotate pct of cases with SD below a clinically notable threshold
-        threshold = 5.0  # mmHg — rough "easy-to-calibrate" cutoff
+        threshold = 5.0  # mmHg - rough "easy-to-calibrate" cutoff
         pct_below = float((sorted_sd < threshold).mean() * 100)
         ax.axvline(
             np.searchsorted(sorted_sd, threshold), color="#E91E63",
@@ -306,7 +306,7 @@ def plot_sd_per_case(raw: dict[str, dict], out_path: Path) -> None:
     plt.close(fig)
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     args = parse_args()
@@ -317,8 +317,8 @@ def main() -> None:
         print("Run bin/construct-dataset first to build the dataset.")
         return
 
-    # ── Load splits ───────────────────────────────────────────────────────────
-    print("Loading dataset splits …")
+    # -- Load splits -----------------------------------------------------------
+    print("Loading dataset splits ...")
     raw: dict[str, dict] = {}
     for split in SPLITS:
         split_dir = dataset_dir / split
@@ -328,13 +328,13 @@ def main() -> None:
         print(f"  {split}: ", end="", flush=True)
         d = load_split(split_dir)
         raw[split] = d
-        print(f"{d['n_cases']} cases · {int(d['seg_counts'].sum()):,} segments")
+        print(f"{d['n_cases']} cases, {int(d['seg_counts'].sum()):,} segments")
 
     if not raw:
         print("ERROR: No split data loaded.")
         return
 
-    # ── Compute statistics ────────────────────────────────────────────────────
+    # -- Compute statistics ----------------------------------------------------
     summary: dict = {}
     for split, d in raw.items():
         summary[split] = {
@@ -345,11 +345,11 @@ def main() -> None:
             "segments_per_case":  _seg_stats(d["seg_counts"], d["case_ids"]),
         }
 
-    # ── Print table ───────────────────────────────────────────────────────────
+    # -- Print table -----------------------------------------------------------
     print()
     cols = (
         f"  {'Split':<8}  {'Cases':>6}  {'Segments':>12}"
-        f"  {'SBP mean±std':>16}  {'DBP mean±std':>16}  {'max/median':>10}"
+        f"  {'SBP mean+/-std':>16}  {'DBP mean+/-std':>16}  {'max/median':>10}"
         f"  {'top10% holds':>13}"
     )
     print(cols)
@@ -363,19 +363,19 @@ def main() -> None:
         spc = s["segments_per_case"]
         print(
             f"  {split:<8}  {s['n_cases']:>6}  {s['n_segments']:>12,}"
-            f"  {sbp['mean']:>7.1f} ± {sbp['std']:<6.1f}"
-            f"  {dbp['mean']:>7.1f} ± {dbp['std']:<6.1f}"
+            f"  {sbp['mean']:>7.1f} +/- {sbp['std']:<6.1f}"
+            f"  {dbp['mean']:>7.1f} +/- {dbp['std']:<6.1f}"
             f"  {spc['max_to_median_ratio']:>10.1f}"
             f"  {spc['top10pct_cases_hold_pct_segments']:>12.1f}%"
         )
     print()
 
-    # ── Save JSON ─────────────────────────────────────────────────────────────
+    # -- Save JSON -------------------------------------------------------------
     stat_path = dataset_dir / "statistic.json"
     stat_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(f"Saved: {stat_path}")
 
-    # ── Save plots ────────────────────────────────────────────────────────────
+    # -- Save plots ------------------------------------------------------------
     bp_path  = dataset_dir / "bp_distribution.png"
     plot_bp_distribution(raw, bp_path)
     print(f"Saved: {bp_path}")

@@ -3,23 +3,23 @@ Evaluate a trained pulsewoq_resnet1d model on the held-out test set.
 
 Two evaluation scenarios:
 
-  Scenario A — Quality threshold filtering
-    Evaluates on three subsets: all segments, quality ≥ 0.2, quality ≥ 0.3.
+  Scenario A - Quality threshold filtering
+    Evaluates on three subsets: all segments, quality >= 0.2, quality >= 0.3.
     For each subset, reports count, ratio, and clinical metrics (MAE, RMSE,
     ME, SD, BHS grade, AAMI pass/fail).  The intent is to check whether
     filtering out low-quality predictions and re-measuring improves accuracy.
 
-  Scenario B — Best-of-N repeated-measurement simulation
+  Scenario B - Best-of-N repeated-measurement simulation
     For each case in the test set, simulates N repeated measurements by
     randomly sampling N segments.  The segment with the highest quality score
     is selected as the final BP estimate.  Plots MAE vs. N so the benefit of
     quality-guided selection grows visible as N increases.
 
 Output files written to the run directory:
-  eval_quality_results.json   — Scenario A metrics (all / q≥0.2 / q≥0.3)
-  eval_quality_scatter.png    — 2×3 scatter plots (SBP / DBP) × (3 thresholds)
-  eval_quality_dist.png       — Quality score distribution histogram
-  eval_best_of_n.png          — Scenario B: MAE vs. number of measurements
+  eval_quality_results.json   - Scenario A metrics (all / q>=0.2 / q>=0.3)
+  eval_quality_scatter.png    - 2x3 scatter plots (SBP / DBP) x (3 thresholds)
+  eval_quality_dist.png       - Quality score distribution histogram
+  eval_best_of_n.png          - Scenario B: MAE vs. number of measurements
 
 Usage:
     uv run python scripts/eval-model-pulsewoq.py <run_dir> [OPTIONS]
@@ -51,12 +51,12 @@ from bpe.train.dataset import PPGDataset
 
 QUALITY_THRESHOLDS = [
     ("All",    None),
-    ("q≥0.2",  0.2),
-    ("q≥0.3",  0.3),
+    ("q>=0.2",  0.2),
+    ("q>=0.3",  0.3),
 ]
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+# -- CLI -----------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -101,7 +101,7 @@ def resolve_device(spec: str) -> torch.device:
     return torch.device(spec)
 
 
-# ── Metrics ───────────────────────────────────────────────────────────────────
+# -- Metrics -------------------------------------------------------------------
 
 def compute_metrics(pred: np.ndarray, true: np.ndarray) -> dict:
     """Return a dict of clinical BP estimation metrics for one channel."""
@@ -141,7 +141,7 @@ def compute_metrics(pred: np.ndarray, true: np.ndarray) -> dict:
     }
 
 
-# ── Inference ─────────────────────────────────────────────────────────────────
+# -- Inference -----------------------------------------------------------------
 
 def run_inference_with_quality(
     model: torch.nn.Module,
@@ -172,16 +172,16 @@ def run_inference_with_quality(
     return preds, qualities, targets
 
 
-# ── Scenario A ────────────────────────────────────────────────────────────────
+# -- Scenario A ----------------------------------------------------------------
 
 def print_threshold_table(label: str, n_total: int, sbp_m: dict, dbp_m: dict) -> None:
     n      = sbp_m["n_samples"]
     ratio  = n / n_total * 100
-    print(f"\n{'─'*62}")
+    print(f"\n{'-'*62}")
     print(f"  {label}  (n = {n:,} / {n_total:,} = {ratio:.1f} %)")
-    print(f"{'─'*62}")
+    print(f"{'-'*62}")
     print(f"  {'Metric':<20}  {'SBP':>10}  {'DBP':>10}")
-    print(f"  {'─'*44}")
+    print(f"  {'-'*44}")
     for key, fmt in [
         ("mae",        ".2f"),
         ("me",         ".2f"),
@@ -200,7 +200,7 @@ def print_threshold_table(label: str, n_total: int, sbp_m: dict, dbp_m: dict) ->
             print(f"  {key:<20}  {sv:>10{fmt}}  {dv:>10{fmt}}")
 
 
-# ── Scenario B ────────────────────────────────────────────────────────────────
+# -- Scenario B ----------------------------------------------------------------
 
 def simulate_best_of_n(
     qualities:  np.ndarray,
@@ -219,7 +219,7 @@ def simulate_best_of_n(
       - Randomly sample N segments from each case (with replacement).
       - Select the segment with the highest quality score.
       - Compare its prediction against its own ground-truth BP.
-    Averages MAE over all cases per trial, then reports mean ± SD over trials.
+    Averages MAE over all cases per trial, then reports mean +/- SD over trials.
 
     Returns:
         n_values, sbp_maes, sbp_stds, dbp_maes, dbp_stds
@@ -230,8 +230,8 @@ def simulate_best_of_n(
     dbp_maes, dbp_stds = [], []
 
     for N in n_values:
-        # For every case, generate (n_trials × N) samples at once.
-        # Shapes per case: choices (n_trials, N) → best_idxs (n_trials,)
+        # For every case, generate (n_trials x N) samples at once.
+        # Shapes per case: choices (n_trials, N) -> best_idxs (n_trials,)
         sbp_per_case = []   # each entry: (n_trials,)
         dbp_per_case = []
         sbp_t_per_case = []
@@ -247,7 +247,7 @@ def simulate_best_of_n(
             sbp_t_per_case.append(true_sbp[best_idxs])
             dbp_t_per_case.append(true_dbp[best_idxs])
 
-        # Stack: (n_cases, n_trials) → MAE over cases per trial → (n_trials,)
+        # Stack: (n_cases, n_trials) -> MAE over cases per trial -> (n_trials,)
         sbp_arr   = np.stack(sbp_per_case)    # (n_cases, n_trials)
         dbp_arr   = np.stack(dbp_per_case)
         sbp_t_arr = np.stack(sbp_t_per_case)
@@ -264,7 +264,7 @@ def simulate_best_of_n(
     return n_values, sbp_maes, sbp_stds, dbp_maes, dbp_stds
 
 
-# ── Plots ─────────────────────────────────────────────────────────────────────
+# -- Plots ---------------------------------------------------------------------
 
 def plot_scatter_by_threshold(
     pred_sbp:  np.ndarray,
@@ -274,7 +274,7 @@ def plot_scatter_by_threshold(
     qualities: np.ndarray,
     out_path:  Path,
 ) -> None:
-    """2×3 scatter grid: (SBP, DBP) rows × (all, q≥0.2, q≥0.3) columns."""
+    """2x3 scatter grid: (SBP, DBP) rows x (all, q>=0.2, q>=0.3) columns."""
     n_total = len(qualities)
     fig, axes = plt.subplots(2, 3, figsize=(18, 11))
 
@@ -301,7 +301,7 @@ def plot_scatter_by_threshold(
             if n == 0:
                 ax.text(0.5, 0.5, "No data", transform=ax.transAxes,
                         ha="center", va="center", fontsize=13, color="gray")
-                ax.set_title(f"{bplabel} — {label}  (n=0, 0.0%)", fontsize=10)
+                ax.set_title(f"{bplabel} - {label}  (n=0, 0.0%)", fontsize=10)
                 ax.set_axis_off()
                 continue
 
@@ -316,7 +316,7 @@ def plot_scatter_by_threshold(
             ax.set_xlabel(f"Actual {bplabel} (mmHg)")
             ax.set_ylabel(f"Predicted {bplabel} (mmHg)")
             ax.set_title(
-                f"{bplabel} — {label}  (n={n:,}, {ratio:.1f}%)\n"
+                f"{bplabel} - {label}  (n={n:,}, {ratio:.1f}%)\n"
                 f"MAE = {mae:.2f} mmHg",
                 fontsize=10,
             )
@@ -339,12 +339,12 @@ def plot_quality_distribution(qualities: np.ndarray, out_path: Path) -> None:
         n_above = int((qualities >= thr).sum())
         ax.axvline(
             thr, color=color, linewidth=1.8, linestyle=ls,
-            label=f"q ≥ {thr}: {n_above:,} ({n_above / n * 100:.1f}%)",
+            label=f"q >= {thr}: {n_above:,} ({n_above / n * 100:.1f}%)",
         )
 
     ax.set_xlabel("Quality score")
     ax.set_ylabel("Segment count")
-    ax.set_title("Quality Score Distribution — test set")
+    ax.set_title("Quality Score Distribution - test set")
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3, axis="y")
     fig.tight_layout()
@@ -360,7 +360,7 @@ def plot_best_of_n(
     dbp_stds:  list[float],
     out_path:  Path,
 ) -> None:
-    """Plot MAE ± 1 SD vs. number of repeated measurements (Scenario B)."""
+    """Plot MAE +/- 1 SD vs. number of repeated measurements (Scenario B)."""
     n  = np.array(n_values)
     sm = np.array(sbp_maes)
     ss = np.array(sbp_stds)
@@ -373,7 +373,7 @@ def plot_best_of_n(
         (axes[0], sm, ss, "SBP", "#2196F3"),
         (axes[1], dm, ds, "DBP", "#FF5722"),
     ]:
-        ax.fill_between(n, mean - std, mean + std, color=color, alpha=0.2, label="±1 SD")
+        ax.fill_between(n, mean - std, mean + std, color=color, alpha=0.2, label="+/-1 SD")
         ax.plot(n, mean, "o-", color=color, linewidth=2, markersize=5, label="Mean MAE")
         # annotate N=1 (random selection baseline) and the last point
         ax.annotate(
@@ -404,14 +404,14 @@ def plot_best_of_n(
     plt.close(fig)
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     args    = parse_args()
     run_dir = args.run_dir
     device  = resolve_device(args.device)
 
-    # ── Validate run directory ────────────────────────────────────────────────
+    # -- Validate run directory ------------------------------------------------
     cfg_path  = run_dir / "config.json"
     ckpt_path = run_dir / "best.pt"
     for path in (cfg_path, ckpt_path):
@@ -427,10 +427,10 @@ def main() -> None:
     print(f"Device        : {device}")
 
     if "pulsewoq" not in model_name:
-        print(f"WARNING: model '{model_name}' is not a pulsewoq variant — "
+        print(f"WARNING: model '{model_name}' is not a pulsewoq variant - "
               "forward_with_quality may not be available.")
 
-    # ── Load model ────────────────────────────────────────────────────────────
+    # -- Load model ------------------------------------------------------------
     model = create_model(model_name).to(device)
     ckpt  = torch.load(ckpt_path, map_location=device, weights_only=True)
     model.load_state_dict(ckpt["model_state_dict"])
@@ -443,7 +443,7 @@ def main() -> None:
         print("ERROR: model does not implement forward_with_quality.", file=sys.stderr)
         sys.exit(1)
 
-    # ── Test dataset ──────────────────────────────────────────────────────────
+    # -- Test dataset ----------------------------------------------------------
     test_dir = args.dataset_dir / "test"
     try:
         test_ds = PPGDataset(test_dir, normalize=not args.no_normalize, preload=False)
@@ -462,8 +462,8 @@ def main() -> None:
         pin_memory=(device.type == "cuda"),
     )
 
-    # ── Inference ─────────────────────────────────────────────────────────────
-    print("Running inference …")
+    # -- Inference -------------------------------------------------------------
+    print("Running inference ...")
     preds, qualities, targets = run_inference_with_quality(model, loader, device)
     pred_sbp, pred_dbp = preds[:, 0],   preds[:, 1]
     true_sbp, true_dbp = targets[:, 0], targets[:, 1]
@@ -475,7 +475,7 @@ def main() -> None:
         f"median={float(np.median(qualities)):.4f}"
     )
 
-    # ── Scenario A ─────────────────────────────────────────────────────────────
+    # -- Scenario A -------------------------------------------------------------
     print("\n" + "=" * 62)
     print("  Scenario A: Quality Threshold Filtering")
     print("=" * 62)
@@ -488,7 +488,7 @@ def main() -> None:
             else (qualities >= threshold)
         )
         if mask.sum() == 0:
-            print(f"\n  {label}: no segments pass this threshold — skipped.")
+            print(f"\n  {label}: no segments pass this threshold - skipped.")
             continue
         sbp_m = compute_metrics(pred_sbp[mask], true_sbp[mask])
         dbp_m = compute_metrics(pred_dbp[mask], true_dbp[mask])
@@ -502,7 +502,7 @@ def main() -> None:
             "dbp":       dbp_m,
         }
 
-    # ── Scenario B ─────────────────────────────────────────────────────────────
+    # -- Scenario B -------------------------------------------------------------
     print("\n\n" + "=" * 62)
     print(
         f"  Scenario B: Best-of-N Simulation  "
@@ -518,7 +518,7 @@ def main() -> None:
           f"(avg {n_total / len(case_groups):.1f} segments/case)")
 
     rng = np.random.default_rng(42)
-    print(f"  Simulating … ", end="", flush=True)
+    print(f"  Simulating ... ", end="", flush=True)
     n_values, sbp_maes, sbp_stds, dbp_maes, dbp_stds = simulate_best_of_n(
         qualities, pred_sbp, pred_dbp, true_sbp, true_dbp,
         case_groups, args.max_n, args.n_trials, rng,
@@ -526,11 +526,11 @@ def main() -> None:
     print("done.")
 
     print(f"\n  {'N':>3}  {'SBP MAE':>10}  {'SBP SD':>8}  {'DBP MAE':>10}  {'DBP SD':>8}")
-    print(f"  {'─'*3}  {'─'*10}  {'─'*8}  {'─'*10}  {'─'*8}")
+    print(f"  {'-'*3}  {'-'*10}  {'-'*8}  {'-'*10}  {'-'*8}")
     for nv, sm, ss, dm, ds in zip(n_values, sbp_maes, sbp_stds, dbp_maes, dbp_stds):
         print(f"  {nv:>3}  {sm:>10.4f}  {ss:>8.4f}  {dm:>10.4f}  {ds:>8.4f}")
 
-    # ── Save results ──────────────────────────────────────────────────────────
+    # -- Save results ----------------------------------------------------------
     results = {
         "run_dir":    str(run_dir),
         "model":      model_name,

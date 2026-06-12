@@ -1,9 +1,9 @@
 """
-Pulse Browser — inspect PPG segments with pulsewo_resnet1d model predictions.
+Pulse Browser - inspect PPG segments with pulsewo_resnet1d model predictions.
 
 Extends dataset-browser with:
-  • live SBP/DBP predictions from the best pulsewo_resnet1d checkpoint
-  • quality-weight visualisation: the model learns per-segment quality scores;
+  - live SBP/DBP predictions from the best pulsewo_resnet1d checkpoint
+  - quality-weight visualisation: the model learns per-segment quality scores;
     softmax of these scores is shown as a bar chart below the PPG waveform and
     as a coloured intensity overlay behind the signal, revealing which 1-second
     windows contributed most to the prediction.
@@ -13,11 +13,11 @@ Layout
   Left panel  : split selector + sortable case list + model status
   Right panel : PPG waveform (with quality-weight shading)
               + quality-weight bar chart (time-aligned, below PPG)
-  Info bar    : case ID · ground-truth SBP/DBP · predicted SBP/DBP · error
+  Info bar    : case ID | ground-truth SBP/DBP | predicted SBP/DBP | error
 
 Navigation
 ----------
-  ← / → : previous / next segment      ↑ / ↓ : previous / next case
+  <- / -> : previous / next segment      Up / Down : previous / next case
   Slider : drag to any segment          Jump  : type segment number + Enter
 
 Usage
@@ -57,7 +57,7 @@ import torch
 import torch.nn.functional as F
 
 
-# ── Korean font (no-op if unavailable) ───────────────────────────────────────
+# -- Korean font (no-op if unavailable) ---------------------------------------
 def _set_cjk_font() -> None:
     available = {f.name for f in fm.fontManager.ttflist}
     for name in ("Malgun Gothic", "AppleGothic", "NanumGothic", "Gulim"):
@@ -72,7 +72,7 @@ _set_cjk_font()
 SPLITS     = ("train", "val", "test")
 MODEL_NAME = "pulsewo_resnet1d"
 
-# ── Light colour palette ──────────────────────────────────────────────────────
+# -- Light colour palette ------------------------------------------------------
 BG_DARK   = "#ffffff"   # plot / main background
 BG_MID    = "#f0f0f7"   # left panel background
 BG_PANEL  = "#e8e8f2"   # info / nav bar background
@@ -95,7 +95,7 @@ SPLIT_BTN_ACTIVE   = {"bg": "#2255cc", "fg": "white",   "relief": "flat"}
 SPLIT_BTN_INACTIVE = {"bg": "#f0f0f7", "fg": "#666677", "relief": "flat"}
 
 
-# ── Model utilities ───────────────────────────────────────────────────────────
+# -- Model utilities -----------------------------------------------------------
 
 def find_best_pt(models_dir: Path) -> Path | None:
     """Return path to best.pt in the most recent run of MODEL_NAME, or None."""
@@ -180,7 +180,7 @@ def infer_with_weights(
     stride  = model.stride    # 62
 
     with torch.no_grad():
-        # (1, 1, L) → (1, 1, S, seg_len)  via overlapping unfold
+        # (1, 1, L) -> (1, 1, S, seg_len)  via overlapping unfold
         x_seg = x.unfold(2, seg_len, stride)
         B, C, S, L_ = x_seg.shape
 
@@ -202,7 +202,7 @@ def infer_with_weights(
     return sbp_pred, dbp_pred, weights, bp_per_seg, q_raw
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+# -- CLI -----------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -220,7 +220,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--device", type=str, default="",
-        help="Inference device: 'cpu', 'cuda', 'cuda:0', … "
+        help="Inference device: 'cpu', 'cuda', 'cuda:0', ... "
              "(default: cuda if available, else cpu)",
     )
     p.add_argument(
@@ -230,7 +230,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-# ── Browser application ───────────────────────────────────────────────────────
+# -- Browser application -------------------------------------------------------
 
 class PulseBrowser:
     LIST_WIDTH = 320
@@ -258,7 +258,7 @@ class PulseBrowser:
 
         # Model state
         self._model: object | None = None
-        self._model_info = "Searching for checkpoint …"
+        self._model_info = "Searching for checkpoint ..."
 
         # App state
         self._split      = "train"
@@ -280,7 +280,7 @@ class PulseBrowser:
         self._select_split("train")
         self._start_metadata_worker()
 
-    # ── Model loading (background) ────────────────────────────────────────────
+    # -- Model loading (background) --------------------------------------------
 
     def _load_model_async(self, models_dir: Path) -> None:
         pt_path = find_best_pt(models_dir)
@@ -289,7 +289,7 @@ class PulseBrowser:
             self._refresh_model_label()
             return
 
-        self._model_info = f"Loading {pt_path.parent.name} …"
+        self._model_info = f"Loading {pt_path.parent.name} ..."
         self._refresh_model_label()
 
         threading.Thread(
@@ -305,8 +305,8 @@ class PulseBrowser:
         if model is not None:
             n_segs = (1000 - model.seg_len) // model.stride + 1
             self._model_info = (
-                f"{MODEL_NAME}  ·  run {pt_path.parent.name}"
-                f"  ·  {n_segs} segs  ·  {self.device}"
+                f"{MODEL_NAME}  |  run {pt_path.parent.name}"
+                f"  |  {n_segs} segs  |  {self.device}"
             )
         else:
             self._model_info = f"Failed to load {pt_path.name}"
@@ -319,7 +319,7 @@ class PulseBrowser:
         if hasattr(self, "_model_status_var"):
             self._model_status_var.set(self._model_info)
 
-    # ── File discovery ────────────────────────────────────────────────────────
+    # -- File discovery --------------------------------------------------------
 
     def _discover_files(self) -> None:
         for split in SPLITS:
@@ -339,7 +339,7 @@ class PulseBrowser:
         return dict(path=path, case=cid, segs=0, segs_text="...",
                     size="...", size_val=0.0, metadata_loaded=False)
 
-    # ── Metadata worker ───────────────────────────────────────────────────────
+    # -- Metadata worker -------------------------------------------------------
 
     def _start_metadata_worker(self) -> None:
         self._meta_total = sum(len(f) for f in self._npz_files.values())
@@ -388,7 +388,7 @@ class PulseBrowser:
 
         if self._current_path is None:
             self._status_var.set(
-                f"Indexing {self._meta_done}/{self._meta_total}…"
+                f"Indexing {self._meta_done}/{self._meta_total}..."
             )
         self.root.after(50, self._drain_metadata_queue)
 
@@ -407,10 +407,10 @@ class PulseBrowser:
         return dict(path=path, case=cid, segs=n_segs, segs_text=str(n_segs),
                     size=f"{size_kb:.0f} KB", size_val=size_kb, metadata_loaded=True)
 
-    # ── UI construction ───────────────────────────────────────────────────────
+    # -- UI construction -------------------------------------------------------
 
     def _build_ui(self) -> None:
-        self.root.title(f"Pulse Browser — {MODEL_NAME}")
+        self.root.title(f"Pulse Browser - {MODEL_NAME}")
         self.root.configure(bg=BG_DARK)
         self.root.geometry(f"{self.LIST_WIDTH + self.CANVAS_W}x{self.WIN_H}")
         self.root.minsize(860, 560)
@@ -440,7 +440,7 @@ class PulseBrowser:
             bg=BG_PANEL, fg=FG_DIM, font=("Segoe UI", 9), anchor="w",
         ).pack(side="left", padx=8)
 
-    # ── Left panel ────────────────────────────────────────────────────────────
+    # -- Left panel ------------------------------------------------------------
 
     def _build_list_panel(self, parent: tk.Frame) -> None:
         btn_row = tk.Frame(parent, bg=BG_MID)
@@ -514,10 +514,10 @@ class PulseBrowser:
             wraplength=self.LIST_WIDTH - 24,
         ).pack(anchor="w", padx=6, pady=(0, 4))
 
-    # ── Right panel ───────────────────────────────────────────────────────────
+    # -- Right panel -----------------------------------------------------------
 
     def _build_canvas_panel(self, parent: tk.Frame) -> None:
-        # ── Info bar ──────────────────────────────────────────────────────────
+        # -- Info bar ----------------------------------------------------------
         info_row = tk.Frame(parent, bg=BG_PANEL, height=36)
         info_row.pack(fill="x")
         info_row.pack_propagate(False)
@@ -541,7 +541,7 @@ class PulseBrowser:
         )
         self._dbp_label.pack(side="left", padx=(0, 8))
 
-        tk.Label(info_row, text="│", bg=BG_PANEL, fg=FG_DIM).pack(side="left")
+        tk.Label(info_row, text="|", bg=BG_PANEL, fg=FG_DIM).pack(side="left")
 
         # Model predictions
         self._pred_sbp_label = tk.Label(
@@ -556,7 +556,7 @@ class PulseBrowser:
         )
         self._pred_dbp_label.pack(side="left", padx=(0, 8))
 
-        tk.Label(info_row, text="│", bg=BG_PANEL, fg=FG_DIM).pack(side="left")
+        tk.Label(info_row, text="|", bg=BG_PANEL, fg=FG_DIM).pack(side="left")
 
         # Errors
         self._err_sbp_label = tk.Label(
@@ -569,14 +569,14 @@ class PulseBrowser:
         )
         self._err_dbp_label.pack(side="left", padx=2)
 
-        # ── Placeholder ───────────────────────────────────────────────────────
+        # -- Placeholder -------------------------------------------------------
         self._placeholder = tk.Label(
-            parent, text="← Select a case from the list",
+            parent, text="<- Select a case from the list",
             bg=BG_DARK, fg="#aaaacc", font=("Segoe UI", 14),
         )
         self._placeholder.pack(expand=True)
 
-        # ── Matplotlib figure (3 vertically stacked axes) ─────────────────────
+        # -- Matplotlib figure (3 vertically stacked axes) ---------------------
         self._fig = plt.Figure(figsize=(8.5, 7.8), facecolor=BG_DARK)
         gs = gridspec.GridSpec(
             3, 1, figure=self._fig,
@@ -593,7 +593,7 @@ class PulseBrowser:
         self._canvas_widget.get_tk_widget().pack_forget()
         self._canvas_packed = False
 
-        # ── Navigation bar ────────────────────────────────────────────────────
+        # -- Navigation bar ----------------------------------------------------
         nav = tk.Frame(parent, bg=BG_PANEL, height=36)
         nav.pack(fill="x", side="bottom")
         nav.pack_propagate(False)
@@ -646,7 +646,7 @@ class PulseBrowser:
         self.root.bind("<Up>",    lambda _: self._prev_case())
         self.root.bind("<Down>",  lambda _: self._next_case())
 
-    # ── Split selection ───────────────────────────────────────────────────────
+    # -- Split selection -------------------------------------------------------
 
     def _select_split(self, split: str) -> None:
         self._split        = split
@@ -678,16 +678,16 @@ class PulseBrowser:
         known = sum(1 for r in rows if r["metadata_loaded"])
         total = sum(r["segs"] for r in rows if r["metadata_loaded"])
         if known < n:
-            self._count_var.set(f"{n} cases · {known}/{n} indexed · {total:,} segs [{self._split}]")
+            self._count_var.set(f"{n} cases | {known}/{n} indexed | {total:,} segs [{self._split}]")
         else:
-            self._count_var.set(f"{n} cases · {total:,} segments [{self._split}]")
+            self._count_var.set(f"{n} cases | {total:,} segments [{self._split}]")
 
     def _sorted_rows(self) -> list[dict]:
         rows = self._rows[self._split][:]
         rows.sort(key=lambda r: r["case"])
         return rows
 
-    # ── Case selection ────────────────────────────────────────────────────────
+    # -- Case selection --------------------------------------------------------
 
     def _on_case_select(self, _event=None) -> None:
         sel = self._tree.selection()
@@ -698,7 +698,7 @@ class PulseBrowser:
             self._load_case(path)
 
     def _load_case(self, path: Path) -> None:
-        self._status_var.set(f"Loading {path.name} …")
+        self._status_var.set(f"Loading {path.name} ...")
         self.root.update_idletasks()
         try:
             data    = np.load(path)
@@ -737,7 +737,7 @@ class PulseBrowser:
         self._tree.selection_set(iid)
         self._tree.see(iid)
 
-    # ── Segment navigation ────────────────────────────────────────────────────
+    # -- Segment navigation ----------------------------------------------------
 
     def _prev_seg(self) -> None:
         if self._x is not None and self._seg_idx > 0:
@@ -781,7 +781,7 @@ class PulseBrowser:
         finally:
             self._slider_updating = False
 
-    # ── Plotting ──────────────────────────────────────────────────────────────
+    # -- Plotting --------------------------------------------------------------
 
     def _show_canvas(self) -> None:
         if not self._canvas_packed:
@@ -815,7 +815,7 @@ class PulseBrowser:
         seg_sec = n_samp / self.target_hz
         t = np.linspace(0, seg_sec, n_samp, endpoint=False)
 
-        # ── Model inference ───────────────────────────────────────────────────
+        # -- Model inference ---------------------------------------------------
         sbp_pred = dbp_pred = None
         weights:    np.ndarray | None = None
         bp_per_seg: np.ndarray | None = None
@@ -828,7 +828,7 @@ class PulseBrowser:
             except Exception as exc:
                 self._status_var.set(f"Inference error: {exc}")
 
-        # ── Info bar ──────────────────────────────────────────────────────────
+        # -- Info bar ----------------------------------------------------------
         cid = self._current_path.stem if self._current_path else "?"
         self._case_label.configure(text=f"Case {cid}")
         self._sbp_label.configure(text=f"SBP {sbp_gt:.0f}")
@@ -836,7 +836,7 @@ class PulseBrowser:
 
         if sbp_pred is not None:
             self._pred_sbp_label.configure(
-                text=f"→ {sbp_pred:.0f}"
+                text=f"-> {sbp_pred:.0f}"
             )
             self._pred_dbp_label.configure(
                 text=f"/ {dbp_pred:.0f} mmHg  pred"
@@ -848,10 +848,10 @@ class PulseBrowser:
                 return "#228844" if abs(e) <= 5 else ("#cc7700" if abs(e) <= 10 else "#cc2200")
 
             self._err_sbp_label.configure(
-                text=f"ΔS {err_sbp:+.0f}", fg=_err_color(err_sbp)
+                text=f"dS {err_sbp:+.0f}", fg=_err_color(err_sbp)
             )
             self._err_dbp_label.configure(
-                text=f"ΔD {err_dbp:+.0f}", fg=_err_color(err_dbp)
+                text=f"dD {err_dbp:+.0f}", fg=_err_color(err_dbp)
             )
         else:
             self._pred_sbp_label.configure(text="")
@@ -859,12 +859,12 @@ class PulseBrowser:
             self._err_sbp_label.configure(text="no model", fg=FG_DIM)
             self._err_dbp_label.configure(text="")
 
-        # ── PPG waveform axes ─────────────────────────────────────────────────
+        # -- PPG waveform axes -------------------------------------------------
         ax_ppg = self._ax_ppg
         ax_ppg.cla()
         ax_ppg.set_facecolor(BG_DARK)
 
-        # Quality-weight shading — one axvspan per overlapping segment
+        # Quality-weight shading - one axvspan per overlapping segment
         top_i: int | None = None
         if weights is not None:
             seg_len = self._model.seg_len   # 125 samples
@@ -923,7 +923,7 @@ class PulseBrowser:
                 )
 
         ax_ppg.set_title(
-            "PPG Waveform  ·  Blue shading = quality-weight intensity",
+            "PPG Waveform  |  Blue shading = quality-weight intensity",
             color=FG_NORM, fontsize=9, pad=4,
         )
 
@@ -931,7 +931,7 @@ class PulseBrowser:
         gt_str   = f"GT   SBP {sbp_gt:.0f}   DBP {dbp_gt:.0f} mmHg"
         pred_str = (
             f"Pred  SBP {sbp_pred:.0f}   DBP {dbp_pred:.0f} mmHg"
-            if sbp_pred is not None else "Pred  —"
+            if sbp_pred is not None else "Pred  -"
         )
         ax_ppg.text(
             0.99, 0.97, gt_str,
@@ -952,7 +952,7 @@ class PulseBrowser:
             zorder=10,
         )
 
-        # ── Quality-weight triangle chart ─────────────────────────────────────
+        # -- Quality-weight triangle chart -------------------------------------
         ax_wt = self._ax_wt
         ax_wt.cla()
         ax_wt.set_facecolor(BG_DARK)
@@ -1034,7 +1034,7 @@ class PulseBrowser:
             color=FG_NORM, fontsize=9, pad=4,
         )
 
-        # ── Per-segment SBP / DBP prediction panel ────────────────────────────
+        # -- Per-segment SBP / DBP prediction panel ----------------------------
         ax_bp = self._ax_bp
         ax_bp.cla()
         ax_bp.set_facecolor(BG_DARK)
@@ -1054,13 +1054,13 @@ class PulseBrowser:
                 centers, sbp_seg,
                 color=SBP_COLOR, linewidth=1.0, linestyle="-",
                 marker="o", markersize=4, zorder=5,
-                label=f"SBP/seg  [{sbp_seg.min():.0f}–{sbp_seg.max():.0f}]",
+                label=f"SBP/seg  [{sbp_seg.min():.0f}-{sbp_seg.max():.0f}]",
             )
             ax_bp.plot(
                 centers, dbp_seg,
                 color=DBP_COLOR, linewidth=1.0, linestyle="-",
                 marker="o", markersize=4, zorder=5,
-                label=f"DBP/seg  [{dbp_seg.min():.0f}–{dbp_seg.max():.0f}]",
+                label=f"DBP/seg  [{dbp_seg.min():.0f}-{dbp_seg.max():.0f}]",
             )
 
             # Numeric labels at each data point
@@ -1127,11 +1127,11 @@ class PulseBrowser:
                    linestyle="--", alpha=0.7, zorder=2)
         ax_bp.set_title(
             "Per-Segment SBP / DBP Predictions"
-            "  ·  dashed = GT  ·  dotted = weighted avg",
+            "  |  dashed = GT  |  dotted = weighted avg",
             color=FG_NORM, fontsize=9, pad=4,
         )
 
-        # ── Finalize ──────────────────────────────────────────────────────────
+        # -- Finalize ----------------------------------------------------------
         self._fig.patch.set_facecolor(BG_DARK)
         self._canvas_widget.draw_idle()
 
@@ -1142,22 +1142,22 @@ class PulseBrowser:
         err_str = ""
         if sbp_pred is not None:
             err_str = (
-                f"  ·  ΔS {sbp_pred - sbp_gt:+.0f}"
-                f"  ΔD {dbp_pred - dbp_gt:+.0f} mmHg"
+                f"  |  dS {sbp_pred - sbp_gt:+.0f}"
+                f"  dD {dbp_pred - dbp_gt:+.0f} mmHg"
             )
         self._status_var.set(
-            f"Case {cid}  ·  seg {idx + 1}/{n_segs}"
-            f"  ·  {n_samp} samples @ {self.target_hz} Hz"
-            f"  ·  SBP {sbp_gt:.0f}  DBP {dbp_gt:.0f} mmHg"
+            f"Case {cid}  |  seg {idx + 1}/{n_segs}"
+            f"  |  {n_samp} samples @ {self.target_hz} Hz"
+            f"  |  SBP {sbp_gt:.0f}  DBP {dbp_gt:.0f} mmHg"
             + err_str
-            + "  ·  [↑↓ case  ←→ seg]"
+            + "  |  [UpDown case  <--> seg]"
         )
 
         self._prev_btn.configure(state="normal" if idx > 0         else "disabled")
         self._next_btn.configure(state="normal" if idx < n_segs - 1 else "disabled")
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# -- Entry point ---------------------------------------------------------------
 
 def main() -> None:
     args = parse_args()

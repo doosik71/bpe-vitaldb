@@ -26,8 +26,8 @@ Options:
 
 Augmentation (all enabled by default; use --no-* to disable):
     --no-aug-noise       Disable Gaussian noise (std=0.01)
-    --no-aug-scale       Disable amplitude scaling (×0.8~1.2)
-    --no-aug-shift       Disable circular time shift (±50 samples)
+    --no-aug-scale       Disable amplitude scaling (x0.8~1.2)
+    --no-aug-shift       Disable circular time shift (+/-50 samples)
     --no-aug-mask        Disable random span masking (5~10% contiguous span, <=1 s)
 
 Patient balancing (enabled by default):
@@ -67,7 +67,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+# -- CLI -----------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -132,7 +132,7 @@ def parse_args() -> argparse.Namespace:
         help="Path to a checkpoint .pt file to resume training from",
     )
 
-    # ── Augmentation flags (all default ON; --no-* to disable) ────────────────
+    # -- Augmentation flags (all default ON; --no-* to disable) ----------------
     aug = p.add_argument_group("augmentation (all enabled by default)")
     aug.add_argument(
         "--no-aug-noise", dest="aug_noise", action="store_false", default=True,
@@ -140,18 +140,18 @@ def parse_args() -> argparse.Namespace:
     )
     aug.add_argument(
         "--no-aug-scale", dest="aug_scale", action="store_false", default=True,
-        help="Disable amplitude scaling augmentation (×0.8~1.2)",
+        help="Disable amplitude scaling augmentation (x0.8~1.2)",
     )
     aug.add_argument(
         "--no-aug-shift", dest="aug_shift", action="store_false", default=True,
-        help="Disable circular time-shift augmentation (±50 samples)",
+        help="Disable circular time-shift augmentation (+/-50 samples)",
     )
     aug.add_argument(
         "--no-aug-mask", dest="aug_mask", action="store_false", default=True,
         help="Disable random span masking augmentation (5~10%% contiguous span, <=1 s)",
     )
 
-    # ── Patient balancing ─────────────────────────────────────────────────────
+    # -- Patient balancing -----------------------------------------------------
     p.add_argument(
         "--no-patient-balance", dest="patient_balance", action="store_false",
         default=True,
@@ -164,7 +164,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers -------------------------------------------------------------------
 
 def resolve_device(spec: str) -> torch.device:
     if spec == "auto":
@@ -227,7 +227,7 @@ def load_resume(
     return state
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     args   = parse_args()
@@ -239,7 +239,7 @@ def main() -> None:
     log.info("Dataset   : %s", args.dataset_dir)
     log.info("Batch size: %d  |  LR: %.2e  |  Epochs: %d", args.batch_size, args.lr, args.epochs)
 
-    # ── Augmentation pipeline ─────────────────────────────────────────────────
+    # -- Augmentation pipeline -------------------------------------------------
     aug_transforms = []
     if args.aug_noise:
         aug_transforms.append(GaussianNoise(std=0.01))
@@ -264,7 +264,7 @@ def main() -> None:
         "enabled (WeightedRandomSampler)" if args.patient_balance else "disabled",
     )
 
-    # ── Datasets ─────────────────────────────────────────────────────────────
+    # -- Datasets -------------------------------------------------------------
     normalize = not args.no_normalize
     try:
         train_ds = PPGDataset(
@@ -293,7 +293,7 @@ def main() -> None:
     seg_len = train_ds.segment_length()
     log.info("Segment length: %d samples", seg_len)
 
-    # ── DataLoaders ───────────────────────────────────────────────────────────
+    # -- DataLoaders -----------------------------------------------------------
     loader_kwargs = dict(
         batch_size  = args.batch_size,
         num_workers = args.workers,
@@ -310,7 +310,7 @@ def main() -> None:
         train_loader = DataLoader(train_ds, shuffle=True, **loader_kwargs)
     val_loader = DataLoader(val_ds, shuffle=False, **loader_kwargs)
 
-    # ── Model ─────────────────────────────────────────────────────────────────
+    # -- Model -----------------------------------------------------------------
     try:
         model = create_model(args.model).to(device)
     except KeyError as e:
@@ -320,7 +320,7 @@ def main() -> None:
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     log.info("Parameters: %s", f"{n_params:,}")
 
-    # ── Optimiser and scheduler ───────────────────────────────────────────────
+    # -- Optimiser and scheduler -----------------------------------------------
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=args.lr,
@@ -332,7 +332,7 @@ def main() -> None:
         eta_min=args.lr * 1e-2,
     )
 
-    # ── Optional resume ───────────────────────────────────────────────────────
+    # -- Optional resume -------------------------------------------------------
     resume_path = args.resume
     if resume_path is None:
         candidate = args.output_dir / args.model / "last.pt"
@@ -344,17 +344,17 @@ def main() -> None:
     if resume_path:
         resume_state = load_resume(model, optimizer, scheduler, resume_path, device)
 
-    # ── Run directory and config ──────────────────────────────────────────────
+    # -- Run directory and config ----------------------------------------------
     run_dir = make_run_dir(args.output_dir, args.model)
     save_config(run_dir, args)
     log.info("Run directory: %s", run_dir)
 
-    # ── Loss function ─────────────────────────────────────────────────────────
+    # -- Loss function ---------------------------------------------------------
     # HuberLoss (delta=5 mmHg): quadratic for |error| < 5, linear beyond.
     # More robust to BP outliers than plain MSE; more stable than MAE.
     criterion = nn.HuberLoss(delta=5.0)
 
-    # ── Train ─────────────────────────────────────────────────────────────────
+    # -- Train -----------------------------------------------------------------
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
@@ -374,7 +374,7 @@ def main() -> None:
         best_epoch=resume_state.get("best_epoch",    0),
     )
 
-    # ── Final summary ─────────────────────────────────────────────────────────
+    # -- Final summary ---------------------------------------------------------
     log.info("=" * 60)
     log.info("Best epoch  : %d", result["best_epoch"])
     log.info("Val loss    : %.4f", result["best_val_loss"])

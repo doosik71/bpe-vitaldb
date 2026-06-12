@@ -30,9 +30,9 @@ DATASET_VERSION = "1.0.1"
 TOTAL_CASES = 6388
 
 # Tracks required for PPG-based blood pressure estimation:
-#   SNUADC/PLETH     — photoplethysmography waveform (500 Hz)
-#   SNUADC/ART       — invasive radial arterial blood pressure waveform (500 Hz)
-#   Solar8000/ART_*  — numeric SBP / DBP / MBP derived from the arterial line
+#   SNUADC/PLETH     - photoplethysmography waveform (500 Hz)
+#   SNUADC/ART       - invasive radial arterial blood pressure waveform (500 Hz)
+#   Solar8000/ART_*  - numeric SBP / DBP / MBP derived from the arterial line
 TARGET_TRACKS = [
     "SNUADC/PLETH",
     "SNUADC/ART",
@@ -179,7 +179,7 @@ def main():
             executor.submit(download_vital_file, cid, output_dir, resume): cid
             for cid in caseids
         }
-        with tqdm(total=len(caseids), unit="case", desc="Downloading") as pbar:
+        with tqdm(total=len(caseids), unit="case", desc="Downloading", ascii=" -+=") as pbar:
             for future in as_completed(futures):
                 caseid, ok, msg = future.result()
                 if msg == "skip":
@@ -194,7 +194,7 @@ def main():
                 pbar.update(1)
 
     log.info("=" * 60)
-    log.info(f"Done — success: {success}, skipped: {skipped}, failed: {len(failed)}")
+    log.info(f"Done - success: {success}, skipped: {skipped}, failed: {len(failed)}")
     if failed:
         log.warning("Failed cases:")
         for cid, reason in failed[:20]:

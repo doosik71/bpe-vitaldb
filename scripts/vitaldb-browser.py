@@ -1,5 +1,5 @@
 """
-VitalDB waveform browser — unified single-window UI
+VitalDB waveform browser - unified single-window UI
 Left panel: case list (always visible, sortable, searchable)
 Center panel: matplotlib waveform canvas (updates on case click)
 Right panel: SBP/DBP search within the current case
@@ -27,7 +27,7 @@ import matplotlib
 matplotlib.use("TkAgg")  # must be set before importing pyplot
 
 
-# ── Korean font (renders cleanly on Windows; no-op on others) ─────────────────
+# -- Korean font (renders cleanly on Windows; no-op on others) -----------------
 def _set_cjk_font():
     candidates = ["Malgun Gothic", "AppleGothic", "NanumGothic", "Gulim"]
     available = {f.name for f in fm.fontManager.ttflist}
@@ -41,7 +41,7 @@ def _set_cjk_font():
 _set_cjk_font()
 
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+# -- Constants -----------------------------------------------------------------
 API_URL = "https://api.vitaldb.net"
 SRATE = 500         # waveform sample rate (Hz)
 WINDOW_SEC = 30     # visible time window (s)
@@ -87,7 +87,7 @@ TAG_COLORS = {
     "ppg_abp": ("#cc0000", "#00cc00"),   # both
 }
 
-# ── Data helpers ──────────────────────────────────────────────────────────────
+# -- Data helpers --------------------------------------------------------------
 
 def list_vital_files(data_dir: Path) -> list[Path]:
     return sorted(
@@ -147,14 +147,14 @@ def duration_sec(data: dict) -> float:
     return 0.0
 
 
-# ── Main application window ───────────────────────────────────────────────────
+# -- Main application window ---------------------------------------------------
 
 class VitalDBBrowser:
     """Single unified window with case list, waveform canvas, and BP search."""
 
-    LIST_WIDTH = 460   # px — left panel width
-    CANVAS_W = 1000   # px — center panel minimum width
-    SEARCH_W = 280   # px — right panel width
+    LIST_WIDTH = 460   # px - left panel width
+    CANVAS_W = 1000   # px - center panel minimum width
+    SEARCH_W = 280   # px - right panel width
     WIN_H = 800
 
     LIST_COLUMNS = [
@@ -206,7 +206,7 @@ class VitalDBBrowser:
         self.root.after(120, self._drain_track_scan_results)
         self._refresh_list()
 
-    # ── Row data ──────────────────────────────────────────────────────────────
+    # -- Row data --------------------------------------------------------------
 
     def _build_rows(self) -> list[dict]:
         rows = []
@@ -235,7 +235,7 @@ class VitalDBBrowser:
             self._row_by_path[f] = row
         return rows
 
-    # ── UI construction ───────────────────────────────────────────────────────
+    # -- UI construction -------------------------------------------------------
 
     def _build_ui(self):
         self.root.title("VitalDB Browser")
@@ -252,28 +252,28 @@ class VitalDBBrowser:
         content.grid_columnconfigure(1, weight=1, minsize=500)
         content.grid_columnconfigure(2, weight=0, minsize=self.SEARCH_W)
 
-        # ── Left panel ───────────────────────────────────────────────────────
+        # -- Left panel -------------------------------------------------------
         left = tk.Frame(content, bg="#f0f0f7", width=self.LIST_WIDTH)
         left.grid(row=0, column=0, sticky="nsew")
         left.grid_propagate(False)
 
         self._build_list_panel(left)
 
-        # ── Center panel ─────────────────────────────────────────────────────
+        # -- Center panel -----------------------------------------------------
         center = tk.Frame(content, bg="#ffffff", width=self.CANVAS_W)
         center.grid(row=0, column=1, sticky="nsew")
         center.grid_propagate(False)
 
         self._build_canvas_panel(center)
 
-        # ── Right panel ──────────────────────────────────────────────────────
+        # -- Right panel ------------------------------------------------------
         right = tk.Frame(content, bg="#f6f6fb", width=self.SEARCH_W)
         right.grid(row=0, column=2, sticky="nsew")
         right.grid_propagate(False)
 
         self._build_search_panel(right)
 
-        # ── Bottom status bar ─────────────────────────────────────────────────
+        # -- Bottom status bar -------------------------------------------------
         bar = tk.Frame(self.root, bg="#e8e8f2", height=22)
         bar.pack(fill="x", side="bottom")
         bar.pack_propagate(False)
@@ -283,7 +283,7 @@ class VitalDBBrowser:
                  bg="#e8e8f2", fg="#888899",
                  font=("Segoe UI", 9), anchor="w").pack(side="left", padx=8)
 
-    # ── Left panel: case list ─────────────────────────────────────────────────
+    # -- Left panel: case list -------------------------------------------------
 
     def _build_list_panel(self, parent: tk.Frame):
         # Search bar
@@ -302,11 +302,11 @@ class VitalDBBrowser:
         # Legend
         legend = tk.Frame(parent, bg="#f0f0f7")
         legend.pack(fill="x", padx=8, pady=(0, 4))
-        tk.Label(legend, text="●", bg="#f0f0f7", fg="#228844",
+        tk.Label(legend, text="o", bg="#f0f0f7", fg="#228844",
                  font=("Segoe UI", 9)).pack(side="left")
         tk.Label(legend, text="PPG  ", bg="#f0f0f7", fg="#888899",
                  font=("Segoe UI", 9)).pack(side="left")
-        tk.Label(legend, text="■", bg="#fde8e8", fg="#cc2200",
+        tk.Label(legend, text="#", bg="#fde8e8", fg="#cc2200",
                  font=("Segoe UI", 9)).pack(side="left")
         tk.Label(legend, text="ABP", bg="#f0f0f7", fg="#888899",
                  font=("Segoe UI", 9)).pack(side="left")
@@ -364,7 +364,7 @@ class VitalDBBrowser:
                  bg="#f0f0f7", fg="#888899",
                  font=("Segoe UI", 8), anchor="w").pack(fill="x", padx=8, pady=(0, 4))
 
-    # ── Center panel: matplotlib canvas ──────────────────────────────────────
+    # -- Center panel: matplotlib canvas --------------------------------------
 
     def _build_canvas_panel(self, parent: tk.Frame):
         parent.grid_rowconfigure(0, weight=1)
@@ -379,7 +379,7 @@ class VitalDBBrowser:
         # Placeholder shown before any case is selected
         self._placeholder = tk.Label(
             self._canvas_host,
-            text="← Select a case from the list",
+            text="<- Select a case from the list",
             bg="#ffffff", fg="#aaaacc",
             font=("Segoe UI", 14),
         )
@@ -389,14 +389,14 @@ class VitalDBBrowser:
         self._fig = plt.Figure(facecolor="#f0f0f7")
         self._canvas = FigureCanvasTkAgg(self._fig, master=self._canvas_host)
         self._canvas_widget = self._canvas.get_tk_widget()
-        # Not gridded yet — shown after first case load
+        # Not gridded yet - shown after first case load
 
         # Navigation bar below the canvas
         self._nav_frame = tk.Frame(parent, bg="#f0f0f7", height=52)
         self._nav_frame.grid(row=1, column=0, sticky="ew")
         self._nav_frame.grid_propagate(False)
 
-    # ── Right panel: SBP/DBP search ──────────────────────────────────────────
+    # -- Right panel: SBP/DBP search ------------------------------------------
 
     def _build_search_panel(self, parent: tk.Frame):
         top = tk.Frame(parent, bg="#f6f6fb")
@@ -511,7 +511,7 @@ class VitalDBBrowser:
         self.root.bind("<Control-Left>", lambda e: self._shift(-60))
         self.root.bind("<Control-Right>", lambda e: self._shift(+60))
 
-    # ── List management ───────────────────────────────────────────────────────
+    # -- List management -------------------------------------------------------
 
     def _refresh_list(self):
         q = self._search_var.get().lower()
@@ -553,7 +553,7 @@ class VitalDBBrowser:
             first = self._tree.get_children()[0]
             self._tree.selection_set(first)
 
-        arr = (" ▲" if not self._sort_rev else " ▼")
+        arr = (" ^" if not self._sort_rev else " v")
         for cid, heading, *_ in self.LIST_COLUMNS:
             self._tree.heading(cid, text=heading +
                                (arr if cid == self._sort_col else ""))
@@ -675,7 +675,7 @@ class VitalDBBrowser:
             f"{len(rows)}/{len(self._all_rows)}  scanned:{n_scanned}  PPG:{n_ppg}  ABP:{n_abp}"
         )
 
-    # ── Case loading ──────────────────────────────────────────────────────────
+    # -- Case loading ----------------------------------------------------------
 
     def _on_case_select(self, event=None):
         sel = self._tree.selection()
@@ -683,11 +683,11 @@ class VitalDBBrowser:
             return
         path = Path(sel[0])
         if self._vf is not None and path == getattr(self, "_current_path", None):
-            return  # same case — no reload
+            return  # same case - no reload
         self._load_case(path)
 
     def _load_case(self, path: Path):
-        self._set_status(f"Loading {path.name} …")
+        self._set_status(f"Loading {path.name} ...")
         self.root.update_idletasks()
 
         try:
@@ -715,10 +715,10 @@ class VitalDBBrowser:
         self._set_status(
             f"Case {path.stem}  |  tracks: {', '.join(avail)}"
             f"  |  duration: {dur_m}m {dur_s}s"
-            f"  |  Keys: ←→ {STEP_SEC}s   Ctrl+←→ 60s"
+            f"  |  Keys: <--> {STEP_SEC}s   Ctrl+<--> 60s"
         )
 
-    # ── Figure construction ───────────────────────────────────────────────────
+    # -- Figure construction ---------------------------------------------------
 
     def _rebuild_figure(self):
         """Reconstruct the matplotlib layout for the newly loaded case."""
@@ -780,7 +780,7 @@ class VitalDBBrowser:
 
         self._draw()
 
-    # ── Waveform drawing ──────────────────────────────────────────────────────
+    # -- Waveform drawing ------------------------------------------------------
 
     def _wave_slice(self, name: str):
         arr = self._data[name]
@@ -876,7 +876,7 @@ class VitalDBBrowser:
 
         self._canvas.draw_idle()
 
-    # ── BP search ────────────────────────────────────────────────────────────
+    # -- BP search ------------------------------------------------------------
 
     def _parse_bp_value(self, text: str) -> int | None:
         text = text.strip()
@@ -951,7 +951,7 @@ class VitalDBBrowser:
         if 0 <= idx < len(self._bp_match_times):
             self._set_time(self._bp_match_times[idx], center=True)
 
-    # ── Navigation ────────────────────────────────────────────────────────────
+    # -- Navigation ------------------------------------------------------------
 
     def _set_time(self, t0: float, *, center: bool = False):
         if self._data is None:
@@ -975,14 +975,14 @@ class VitalDBBrowser:
         self._t0 = float(val)
         self._draw()
 
-    # ── Track info window ─────────────────────────────────────────────────────
+    # -- Track info window -----------------------------------------------------
 
     def _show_track_info(self):
         if self._vf is None:
             return
 
         win = tk.Toplevel(self.root)
-        win.title(f"Track Info — Case {self._current_path.stem}")
+        win.title(f"Track Info - Case {self._current_path.stem}")
         win.configure(bg="#f0f0f7")
         win.geometry("620x460")
 
@@ -1030,7 +1030,7 @@ class VitalDBBrowser:
         bot.pack(fill="x", padx=10, pady=(0, 10))
         n_w = sum(1 for t in self._vf.trks.values() if t.srate > 0)
         n_n = sum(1 for t in self._vf.trks.values() if t.srate == 0)
-        tk.Label(bot, text=f"{len(self._vf.trks)} tracks — {n_w} waveform, {n_n} numeric",
+        tk.Label(bot, text=f"{len(self._vf.trks)} tracks - {n_w} waveform, {n_n} numeric",
                  bg="#f0f0f7", fg="#888899", font=("Segoe UI", 9)).pack(side="left")
         tk.Button(bot, text="Close", command=win.destroy,
                   bg="#d0d8f0", fg="#222233", activebackground="#3366cc",
@@ -1038,7 +1038,7 @@ class VitalDBBrowser:
                   font=("Segoe UI", 9), padx=12, pady=3, cursor="hand2"
                   ).pack(side="right")
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
+    # -- Helpers ---------------------------------------------------------------
 
     def _set_status(self, text: str):
         self._status_var.set(text)
@@ -1050,7 +1050,7 @@ class VitalDBBrowser:
         self.root.destroy()
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+# -- CLI -----------------------------------------------------------------------
 
 def parse_args():
     p = argparse.ArgumentParser(

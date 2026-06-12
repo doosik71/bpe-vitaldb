@@ -1,12 +1,12 @@
 """
-Spectrogram Browser — inspect PPG segments with time-frequency analysis.
+Spectrogram Browser - inspect PPG segments with time-frequency analysis.
 
 Based on psd-browser.py with a spectrogram view so temporal changes in the
 frequency content are visible:
-  • waveform plot for the selected PPG segment
-  • spectrogram plot with a dominant-frequency trace over time
-  • power_ratio = Power(0.67–3.0 Hz) / Power(0.5–10.0 Hz)
-  • quick navigation by power_ratio range in a right-side panel
+  - waveform plot for the selected PPG segment
+  - spectrogram plot with a dominant-frequency trace over time
+  - power_ratio = Power(0.67-3.0 Hz) / Power(0.5-10.0 Hz)
+  - quick navigation by power_ratio range in a right-side panel
 
 Usage:
     uv run python scripts/spectro-browser.py [OPTIONS]
@@ -489,7 +489,7 @@ class SpectrogramBrowser:
 
         self._placeholder = tk.Label(
             parent,
-            text="← Select a case from the list",
+            text="<- Select a case from the list",
             bg=BG_DARK,
             fg="#aaaacc",
             font=("Segoe UI", 14),
@@ -999,11 +999,11 @@ class SpectrogramBrowser:
         self._canvas_widget.draw_idle()
 
         self._status_var.set(
-            f"Case {cid}  ·  segment {idx + 1}/{n_segs}"
-            f"  ·  {n_samp} samples @ {self.target_hz} Hz"
-            f"  ·  ratio {ratio:.4f}"
-            f"  ·  dom.freq mean {dom_mean:.3f} Hz"
-            f"  ·  [↑↓ case  ←→ segment]"
+            f"Case {cid}  |  segment {idx + 1}/{n_segs}"
+            f"  |  {n_samp} samples @ {self.target_hz} Hz"
+            f"  |  ratio {ratio:.4f}"
+            f"  |  dom.freq mean {dom_mean:.3f} Hz"
+            f"  |  [UpDown case  <--> segment]"
         )
 
         self._prev_btn.configure(state="normal" if idx > 0 else "disabled")

@@ -26,7 +26,7 @@ from torch import nn
 from bpe.models import create_model, list_models
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# -- helpers ------------------------------------------------------------------
 
 def _fmt_shape(shape) -> str:
     if shape is None:
@@ -56,7 +56,7 @@ def _trainable_params(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-# ── forward-hook capture ──────────────────────────────────────────────────────
+# -- forward-hook capture ------------------------------------------------------
 
 def _collect_output_shapes(
     model: nn.Module,
@@ -81,7 +81,7 @@ def _collect_output_shapes(
                         if isinstance(item, torch.Tensor):
                             shapes[n] = tuple(item.shape)
                             break
-                # non-tensor outputs (e.g. Identity on skip path) → None
+                # non-tensor outputs (e.g. Identity on skip path) -> None
                 if n not in shapes:
                     shapes[n] = None
             return hook
@@ -101,7 +101,7 @@ def _collect_output_shapes(
     return shapes
 
 
-# ── table printer ─────────────────────────────────────────────────────────────
+# -- table printer -------------------------------------------------------------
 
 _COL_NAME   = 52
 _COL_TYPE   = 28
@@ -129,7 +129,7 @@ def _row(name: str, module: nn.Module, shape) -> str:
     )
 
 
-# ── per-model dummy input factory ─────────────────────────────────────────────
+# -- per-model dummy input factory ---------------------------------------------
 
 def _make_inputs(
     model_name: str,
@@ -143,7 +143,7 @@ def _make_inputs(
     return (ppg,), {}
 
 
-# ── main display function ─────────────────────────────────────────────────────
+# -- main display function -----------------------------------------------------
 
 def print_model_summary(
     model_name: str,
@@ -186,7 +186,7 @@ def print_model_summary(
     )
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+# -- CLI -----------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(

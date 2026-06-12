@@ -62,8 +62,8 @@ SBP_RANGE = (50, 250)    # physiological bounds (mmHg)
 DBP_RANGE = (20, 150)
 BP_VALID_MIN_FRAC = 0.5  # minimum fraction of valid 1-Hz BP samples per window
 
-BANDPASS_LO    = 0.5     # Hz — high-pass cut: removes slow baseline drift
-BANDPASS_HI    = 10.0    # Hz — low-pass cut: removes high-frequency noise
+BANDPASS_LO    = 0.5     # Hz - high-pass cut: removes slow baseline drift
+BANDPASS_HI    = 10.0    # Hz - low-pass cut: removes high-frequency noise
 BANDPASS_ORDER = 4       # filter order (4th-order Butterworth)
 
 INDEX_FILE = "index.csv"  # per-split resume index: case_id, n_segments
@@ -72,7 +72,7 @@ log = logging.getLogger(__name__)
 
 
 def _bandpass_filter(signal: np.ndarray, fs: int) -> np.ndarray:
-    """Apply a 4th-order zero-phase Butterworth bandpass filter (0.5–10 Hz).
+    """Apply a 4th-order zero-phase Butterworth bandpass filter (0.5-10 Hz).
 
     sosfiltfilt performs forward-backward filtering, yielding zero phase
     distortion and effectively doubling the filter order.
@@ -180,19 +180,19 @@ def process_case(
     stride_sec      = segment_sec // 2              # stride in seconds (for 1-Hz arrays)
     guard_samples   = guard_sec * target_hz         # guard-band length (0 = disabled)
 
-    # ── open file ────────────────────────────────────────────────────────────
+    # -- open file ------------------------------------------------------------
     try:
         vf        = VitalFile(str(path))
         available = set(vf.get_track_names())
     except Exception as exc:
-        log.warning("%s: cannot open — %s", path.stem, exc)
+        log.warning("%s: cannot open - %s", path.stem, exc)
         return None
 
     required = {"SNUADC/PLETH", "Solar8000/ART_SBP", "Solar8000/ART_DBP"}
     if not required.issubset(available):
         return None
 
-    # ── load tracks ──────────────────────────────────────────────────────────
+    # -- load tracks ----------------------------------------------------------
     try:
         ppg_raw = vf.to_numpy(["SNUADC/PLETH"], interval=1 / SOURCE_HZ)[:, 0]
         bp_raw  = vf.to_numpy(
@@ -201,15 +201,15 @@ def process_case(
         sbp_1hz = bp_raw[:, 0]
         dbp_1hz = bp_raw[:, 1]
     except Exception as exc:
-        log.warning("%s: track read error — %s", path.stem, exc)
+        log.warning("%s: track read error - %s", path.stem, exc)
         return None
 
-    # ── decimate PPG ─────────────────────────────────────────────────────────
+    # -- decimate PPG ---------------------------------------------------------
     # Bandpass filter is applied per-window (after NaN check) because
     # sosfiltfilt propagates NaN from any single bad sample to the entire signal.
     ppg = ppg_raw[::factor]   # shape: (T * target_hz / SOURCE_HZ,)
 
-    # ── compute window count ─────────────────────────────────────────────────
+    # -- compute window count -------------------------------------------------
     total_sec = min(len(ppg) / target_hz, len(sbp_1hz), len(dbp_1hz))
     if total_sec < segment_sec:
         return None
@@ -229,7 +229,7 @@ def process_case(
             break
 
         # Guard-band: extend the filter region by guard_samples on each side.
-        # When guard_sec=0 (--no-guard), fs=ps and fe=pe — identical to no-guard.
+        # When guard_sec=0 (--no-guard), fs=ps and fe=pe - identical to no-guard.
         fs = ps - guard_samples
         fe = pe + guard_samples
         if fs < 0 or fe > len(ppg):
@@ -294,7 +294,7 @@ def _process_chunk(args: tuple) -> tuple[dict[str, int], dict[str, int]]:
             out_path = out_dir / f"{path.stem}.npz"
             tmp_path = out_dir / f".{path.stem}.tmp.npz"
             np.savez_compressed(tmp_path, x=x, y=y)
-            tmp_path.rename(out_path)  # atomic on POSIX — no partial file on crash
+            tmp_path.rename(out_path)  # atomic on POSIX - no partial file on crash
             seg_counts[split_name] = seg_counts.get(split_name, 0) + len(x)
             n_segs = len(x)
 
@@ -314,12 +314,12 @@ def main() -> None:
 
     args = parse_args()
 
-    # ── validate split ratios ────────────────────────────────────────────────
+    # -- validate split ratios ------------------------------------------------
     ratio_sum = sum(args.split)
     if abs(ratio_sum - 1.0) > 1e-6:
         raise ValueError(f"--split ratios must sum to 1.0, got {ratio_sum:.4f}")
 
-    # ── discover .vital files ────────────────────────────────────────────────
+    # -- discover .vital files ------------------------------------------------
     vital_files: list[Path] = sorted(
         args.data_dir.glob("*.vital"),
         key=lambda p: int(p.stem) if p.stem.isdigit() else 0,
@@ -342,7 +342,7 @@ def main() -> None:
         args.split[0] * 100, args.split[1] * 100, args.split[2] * 100,
     )
 
-    # ── shuffle and split at the case level ──────────────────────────────────
+    # -- shuffle and split at the case level ----------------------------------
     rng      = random.Random(args.seed)
     shuffled = vital_files[:]
     rng.shuffle(shuffled)
@@ -359,11 +359,11 @@ def main() -> None:
     for name, files in splits.items():
         log.info("  %-5s : %d cases", name, len(files))
 
-    # ── create output directories ─────────────────────────────────────────────
+    # -- create output directories ---------------------------------------------
     for split_name in splits:
         (args.output_dir / split_name).mkdir(parents=True, exist_ok=True)
 
-    # ── warn about NPZ files not assigned to the current split ───────────────
+    # -- warn about NPZ files not assigned to the current split ---------------
     for split_name, files in splits.items():
         expected = {p.stem for p in files}
         orphans  = [
@@ -371,14 +371,14 @@ def main() -> None:
             if npz.stem not in expected
         ]
         if orphans:
-            sample = ", ".join(sorted(orphans)[:5]) + ("…" if len(orphans) > 5 else "")
+            sample = ", ".join(sorted(orphans)[:5]) + ("..." if len(orphans) > 5 else "")
             log.warning(
                 "  %-5s : %d NPZ file(s) not in current split assignment "
-                "(seed/ratio/file-list change?) — %s",
+                "(seed/ratio/file-list change?) - %s",
                 split_name, len(orphans), sample,
             )
 
-    # ── build flat task list (all splits combined) ────────────────────────────
+    # -- build flat task list (all splits combined) ----------------------------
     all_tasks: list[tuple[Path, Path, str]] = [
         (path, args.output_dir / split_name, split_name)
         for split_name, files in splits.items()
@@ -390,12 +390,12 @@ def main() -> None:
         for split_name in splits
     }
 
-    # ── clear index files when a full re-run is requested ────────────────────
+    # -- clear index files when a full re-run is requested --------------------
     if not resume:
         for csv_path in csv_paths.values():
             csv_path.unlink(missing_ok=True)
 
-    # ── load or initialise per-split indexes; pre-filter tasks ───────────────
+    # -- load or initialise per-split indexes; pre-filter tasks ---------------
     # index.csv tracks every attempted case: case_id, n_segments
     # n_segments == 0 means the case failed; skipped on subsequent runs.
     resume_counts:     dict[str, int] = {name: 0 for name in splits}
@@ -439,15 +439,15 @@ def main() -> None:
             if case_id in index:
                 n_segs = index[case_id]
                 if n_segs == 0:
-                    resume_counts[split_name] += 1          # failed before — skip
+                    resume_counts[split_name] += 1          # failed before - skip
                 elif out_file.exists():
-                    resume_counts[split_name]      += 1     # success + NPZ present — skip
+                    resume_counts[split_name]      += 1     # success + NPZ present - skip
                     resumed_seg_counts[split_name] += n_segs
                 else:
-                    pending.append((path, out_dir, split_name))  # NPZ lost — re-process
+                    pending.append((path, out_dir, split_name))  # NPZ lost - re-process
             else:
                 if out_file.exists() and out_file.stat().st_size > 0:
-                    # Legacy NPZ not yet in index — record it and skip
+                    # Legacy NPZ not yet in index - record it and skip
                     try:
                         n_segs = _npz_segment_count(out_file)
                     except Exception:
@@ -463,7 +463,7 @@ def main() -> None:
 
     all_tasks = pending
 
-    # ── divide tasks into per-worker chunks ───────────────────────────────────
+    # -- divide tasks into per-worker chunks -----------------------------------
     seg_counts:  dict[str, int] = {name: 0 for name in splits}
     skip_counts: dict[str, int] = {name: 0 for name in splits}
 
@@ -471,7 +471,7 @@ def main() -> None:
         n_workers = min(nproc, len(all_tasks))
         chunks    = [all_tasks[i::n_workers] for i in range(n_workers)]
 
-        # ── run workers with per-worker progress bars ─────────────────────────
+        # -- run workers with per-worker progress bars -------------------------
         tqdm.set_lock(mp.RLock())
         with mp.Manager() as manager:
             csv_lock    = manager.Lock()
@@ -499,11 +499,11 @@ def main() -> None:
         n_skipped = skip_counts[split_name]
         n_resumed = resume_counts[split_name]
         log.info(
-            "  %-5s done — %s segments from %d new cases (%d resumed, %d skipped)",
+            "  %-5s done - %s segments from %d new cases (%d resumed, %d skipped)",
             split_name, f"{n_segs:,}", len(files) - n_skipped - n_resumed, n_resumed, n_skipped,
         )
 
-    # ── summary ──────────────────────────────────────────────────────────────
+    # -- summary --------------------------------------------------------------
     log.info("=" * 60)
     total_new = sum(seg_counts.values())
     total_all = total_new + sum(resumed_seg_counts.values())

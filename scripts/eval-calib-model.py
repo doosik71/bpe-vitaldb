@@ -7,11 +7,11 @@ subset of segments from the specified test case, then evaluates the
 calibrated model on all segments of that case.
 
 Files written to data/models/<model_id>/<case_id>/:
-  calib.pt          — calibrated model checkpoint
-  eval_results.json — MAE, RMSE, ME, SD; BHS grade; AAMI pass/fail
-  eval_plot.png     — predicted vs actual scatter plots for SBP and DBP
-  error_hist.png    — error distribution histograms for SBP and DBP
-  bland_altman.png  — Bland-Altman plots for SBP and DBP
+  calib.pt          - calibrated model checkpoint
+  eval_results.json - MAE, RMSE, ME, SD; BHS grade; AAMI pass/fail
+  eval_plot.png     - predicted vs actual scatter plots for SBP and DBP
+  error_hist.png    - error distribution histograms for SBP and DBP
+  bland_altman.png  - Bland-Altman plots for SBP and DBP
 
 Usage:
     uv run python scripts/eval-calib-model.py <run_dir> [OPTIONS]
@@ -100,7 +100,7 @@ def resolve_device(spec: str) -> torch.device:
     return torch.device(spec)
 
 
-# ── Single-case dataset ────────────────────────────────────────────────────────
+# -- Single-case dataset --------------------------------------------------------
 
 class CaseDataset(Dataset):
     """Minimal Dataset wrapping one case NPZ file.
@@ -136,7 +136,7 @@ class CaseDataset(Dataset):
         return x, y
 
 
-# ── Last-layer utilities ───────────────────────────────────────────────────────
+# -- Last-layer utilities -------------------------------------------------------
 
 def get_bp_output_layer(model: nn.Module) -> tuple[str, nn.Linear]:
     """Return (name, module) of the last nn.Linear with out_features == 2.
@@ -169,7 +169,7 @@ def freeze_all_except(model: nn.Module, layer_name: str) -> None:
                 param.requires_grad_(True)
 
 
-# ── Metrics (same as eval-model.py) ───────────────────────────────────────────
+# -- Metrics (same as eval-model.py) -------------------------------------------
 
 def compute_metrics(pred: np.ndarray, true: np.ndarray) -> dict:
     err  = pred - true
@@ -208,7 +208,7 @@ def compute_metrics(pred: np.ndarray, true: np.ndarray) -> dict:
     }
 
 
-# ── Plots (same as eval-model.py) ─────────────────────────────────────────────
+# -- Plots (same as eval-model.py) ---------------------------------------------
 
 def plot_scatter(
     pred_sbp: np.ndarray,
@@ -288,9 +288,9 @@ def plot_bland_altman(
         ax.axhline(loa_upper, color="#FF9800", linewidth=1.2, linestyle="--",
                    label=f"+1.96 SD = {loa_upper:.2f} mmHg")
         ax.axhline(loa_lower, color="#FF9800", linewidth=1.2, linestyle="--",
-                   label=f"−1.96 SD = {loa_lower:.2f} mmHg")
+                   label=f"-1.96 SD = {loa_lower:.2f} mmHg")
         ax.set_xlabel(f"Mean of Actual and Predicted {label} (mmHg)")
-        ax.set_ylabel(f"Predicted − Actual {label} (mmHg)")
+        ax.set_ylabel(f"Predicted - Actual {label} (mmHg)")
         ax.set_title(f"{label}: Bland-Altman Plot")
         ax.legend(fontsize=8)
         ax.grid(True, alpha=0.3)
@@ -299,7 +299,7 @@ def plot_bland_altman(
     plt.close(fig)
 
 
-# ── Inference ─────────────────────────────────────────────────────────────────
+# -- Inference -----------------------------------------------------------------
 
 def run_inference(
     model: nn.Module,
@@ -324,7 +324,7 @@ def run_inference(
     return preds.astype(np.float32), targets.astype(np.float32), elapsed
 
 
-# ── Calibration ───────────────────────────────────────────────────────────────
+# -- Calibration ---------------------------------------------------------------
 
 def calibrate(
     model: nn.Module,
@@ -370,7 +370,7 @@ def calibrate(
     return total_loss / n_batches if n_batches > 0 else 0.0
 
 
-# ── Metrics table printer ─────────────────────────────────────────────────────
+# -- Metrics table printer -----------------------------------------------------
 
 def print_metrics(sbp_m: dict, dbp_m: dict, avg_ms: float) -> None:
     print(f"\n{'Metric':<18}  {'SBP':>10}  {'DBP':>10}")
@@ -397,14 +397,14 @@ def print_metrics(sbp_m: dict, dbp_m: dict, avg_ms: float) -> None:
     print(f"  {'avg_ms/sample':<16}  {avg_ms:>10.3f}")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     args   = parse_args()
     run_dir = args.run_dir
     device  = resolve_device(args.device)
 
-    # ── Load model ────────────────────────────────────────────────────────────
+    # -- Load model ------------------------------------------------------------
     cfg_path  = run_dir / "config.json"
     ckpt_path = run_dir / "best.pt"
     for path in (cfg_path, ckpt_path):
@@ -429,7 +429,7 @@ def main() -> None:
     best_epoch = ckpt.get("epoch", "?")
     print(f"Loaded best.pt (epoch {best_epoch})")
 
-    # ── Resolve test case ─────────────────────────────────────────────────────
+    # -- Resolve test case -----------------------------------------------------
     test_dir = args.dataset_dir / "test"
     if not test_dir.exists():
         print(f"ERROR: {test_dir} not found.", file=sys.stderr)
@@ -455,7 +455,7 @@ def main() -> None:
 
     print(f"Case          : {case_id}")
 
-    # ── Determine calibration segment count ───────────────────────────────────
+    # -- Determine calibration segment count -----------------------------------
     case_data = np.load(case_file)
     n_total   = int(case_data["x"].shape[0])
     print(f"Total segments: {n_total}")
@@ -475,16 +475,16 @@ def main() -> None:
     normalize = not args.no_normalize
     calib_ds  = CaseDataset(case_file, normalize=normalize, indices=calib_indices)
 
-    # ── Output directory ──────────────────────────────────────────────────────
+    # -- Output directory ------------------------------------------------------
     calib_dir = run_dir / case_id
     calib_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── Calibrate ─────────────────────────────────────────────────────────────
-    print("\nCalibrating …")
+    # -- Calibrate -------------------------------------------------------------
+    print("\nCalibrating ...")
     calib_loss = calibrate(model, calib_ds, device, lr=args.lr, batch_size=args.batch_size)
     print(f"  Calib MSE loss: {calib_loss:.6f}")
 
-    # ── Save calibrated checkpoint ────────────────────────────────────────────
+    # -- Save calibrated checkpoint --------------------------------------------
     calib_ckpt_path = calib_dir / "calib.pt"
     torch.save(
         {
@@ -502,8 +502,8 @@ def main() -> None:
     )
     print(f"  Saved: {calib_ckpt_path}")
 
-    # ── Evaluate on ALL segments of the case ──────────────────────────────────
-    print("\nEvaluating on all segments …")
+    # -- Evaluate on ALL segments of the case ----------------------------------
+    print("\nEvaluating on all segments ...")
     all_ds = CaseDataset(case_file, normalize=normalize)
     all_loader = DataLoader(
         all_ds, batch_size=args.batch_size, shuffle=False,
@@ -522,7 +522,7 @@ def main() -> None:
 
     print_metrics(sbp_m, dbp_m, avg_ms)
 
-    # ── Save results ──────────────────────────────────────────────────────────
+    # -- Save results ----------------------------------------------------------
     results = {
         "run_dir":           str(run_dir),
         "model":             model_name,

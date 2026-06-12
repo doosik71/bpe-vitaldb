@@ -1,13 +1,13 @@
 """
-PSD Browser — inspect PPG segments and their power spectral density.
+PSD Browser - inspect PPG segments and their power spectral density.
 
 Based on dataset-browser.py with an added Welch PSD view and
 power-ratio analysis:
-  • waveform plot for the selected PPG segment
-  • PSD plot with highlighted 0.5–10.0 Hz and 0.67–3.0 Hz bands
-  • power_ratio = Power(0.67–3.0 Hz) / Power(0.5–10.0 Hz)
-  • per-case ratio summary shown in the info bar
-  • quick navigation by power_ratio range in a right-side panel
+  - waveform plot for the selected PPG segment
+  - PSD plot with highlighted 0.5-10.0 Hz and 0.67-3.0 Hz bands
+  - power_ratio = Power(0.67-3.0 Hz) / Power(0.5-10.0 Hz)
+  - per-case ratio summary shown in the info bar
+  - quick navigation by power_ratio range in a right-side panel
 
 Usage:
     uv run python scripts/psd-browser.py [OPTIONS]
@@ -41,7 +41,7 @@ from scipy.signal import welch
 from tqdm import tqdm
 
 
-# ── Korean font (no-op if unavailable) ───────────────────────────────────────
+# -- Korean font (no-op if unavailable) ---------------------------------------
 def _set_cjk_font() -> None:
     available = {f.name for f in fm.fontManager.ttflist}
     for name in ("Malgun Gothic", "AppleGothic", "NanumGothic", "Gulim"):
@@ -89,7 +89,7 @@ RATIO_BINS = [
 ]
 
 
-# ── argparse ──────────────────────────────────────────────────────────────────
+# -- argparse ------------------------------------------------------------------
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Browse NPZ dataset segments with PSD analysis",
@@ -117,7 +117,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-# ── PSD utilities ─────────────────────────────────────────────────────────────
+# -- PSD utilities -------------------------------------------------------------
 def compute_psd(signal: np.ndarray, fs: int, nperseg: int) -> tuple[np.ndarray, np.ndarray]:
     freqs, psd = welch(
         signal,
@@ -153,7 +153,7 @@ def compute_ratio_stats(
     return freqs, psd, heart_power, passband_power, ratio
 
 
-# ── Browser application ───────────────────────────────────────────────────────
+# -- Browser application -------------------------------------------------------
 class PSDBrowser:
     LIST_WIDTH = 320
     SEARCH_W = 270
@@ -467,7 +467,7 @@ class PSDBrowser:
 
         self._placeholder = tk.Label(
             parent,
-            text="← Select a case from the list",
+            text="<- Select a case from the list",
             bg=BG_DARK,
             fg="#aaaacc",
             font=("Segoe UI", 14),
@@ -982,17 +982,17 @@ class PSDBrowser:
         self._canvas_widget.draw_idle()
 
         self._status_var.set(
-            f"Case {cid}  ·  segment {idx + 1}/{n_segs}"
-            f"  ·  {n_samp} samples @ {self.target_hz} Hz"
-            f"  ·  ratio {ratio:.4f}"
-            f"  ·  [↑↓ case  ←→ segment]"
+            f"Case {cid}  |  segment {idx + 1}/{n_segs}"
+            f"  |  {n_samp} samples @ {self.target_hz} Hz"
+            f"  |  ratio {ratio:.4f}"
+            f"  |  [UpDown case  <--> segment]"
         )
 
         self._prev_btn.configure(state="normal" if idx > 0 else "disabled")
         self._next_btn.configure(state="normal" if idx < n_segs - 1 else "disabled")
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# -- Entry point ---------------------------------------------------------------
 def main() -> None:
     args = parse_args()
 

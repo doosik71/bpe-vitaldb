@@ -3,7 +3,7 @@ Construct a filtered train / val / test dataset from existing NPZ dataset files.
 
 This script reads `data/dataset/{train,val,test}/*.npz`, computes
 
-    power_ratio = Power(0.67–3.0 Hz) / Power(0.5–10.0 Hz)
+    power_ratio = Power(0.67-3.0 Hz) / Power(0.5-10.0 Hz)
 
 for every PPG segment, and keeps only segments whose power_ratio is at least
 `--power-ratio-min`.
@@ -176,7 +176,7 @@ def process_case(
             x = np.asarray(data["x"], dtype=np.float32)
             y = np.asarray(data["y"], dtype=np.float32)
     except Exception as exc:
-        log.warning("%s: cannot load NPZ — %s", path.stem, exc)
+        log.warning("%s: cannot load NPZ - %s", path.stem, exc)
         return None
 
     if x.ndim != 2 or y.ndim != 2 or len(x) != len(y):
@@ -392,7 +392,7 @@ def main() -> None:
         n_skipped = skip_counts[split_name]
         n_resumed = resume_counts[split_name]
         log.info(
-            "  %-5s done — %s segments from %d new cases (%d resumed, %d filtered-out)",
+            "  %-5s done - %s segments from %d new cases (%d resumed, %d filtered-out)",
             split_name,
             f"{n_segs:,}",
             len(files) - n_skipped - n_resumed,

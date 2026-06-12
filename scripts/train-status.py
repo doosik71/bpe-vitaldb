@@ -2,8 +2,8 @@
 Show training progress for a BPE model run.
 
 Reads metrics.csv from a run directory and writes two PNG graphs:
-  loss_graph.png  — train_loss vs val_loss per epoch
-  mae_graph.png   — SBP/DBP MAE (train + val) per epoch
+  loss_graph.png  - train_loss vs val_loss per epoch
+  mae_graph.png   - SBP/DBP MAE (train + val) per epoch
 
 Usage:
     uv run python scripts/train-status.py <run_dir>

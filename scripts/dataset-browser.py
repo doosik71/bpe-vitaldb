@@ -1,5 +1,5 @@
 """
-Dataset Browser — inspect NPZ segment files produced by construct-dataset.py
+Dataset Browser - inspect NPZ segment files produced by construct-dataset.py
 
 Left panel:   split selector (Train / Val / Test) + sortable case list
 Right panel:  PPG waveform for the selected segment, SBP / DBP labels,
@@ -34,7 +34,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tqdm import tqdm
 
 
-# ── Korean font (no-op if unavailable) ───────────────────────────────────────
+# -- Korean font (no-op if unavailable) ---------------------------------------
 def _set_cjk_font():
     available = {f.name for f in fm.fontManager.ttflist}
     for name in ("Malgun Gothic", "AppleGothic", "NanumGothic", "Gulim"):
@@ -66,7 +66,7 @@ SPLIT_BTN_ACTIVE   = {"bg": "#2255cc", "fg": "white",    "relief": "flat"}
 SPLIT_BTN_INACTIVE = {"bg": "#f0f0f7", "fg": "#666677",  "relief": "flat"}
 
 
-# ── argparse ──────────────────────────────────────────────────────────────────
+# -- argparse ------------------------------------------------------------------
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Browse NPZ dataset segments",
@@ -84,7 +84,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-# ── Browser application ───────────────────────────────────────────────────────
+# -- Browser application -------------------------------------------------------
 class DatasetBrowser:
     LIST_WIDTH  = 320
     CANVAS_W    = 860
@@ -121,7 +121,7 @@ class DatasetBrowser:
         self._select_split("train")
         self._start_metadata_worker()
 
-    # ── File discovery ────────────────────────────────────────────────────────
+    # -- File discovery --------------------------------------------------------
 
     def _discover_files(self):
         for split in SPLITS:
@@ -226,7 +226,7 @@ class DatasetBrowser:
             metadata_loaded=True,
         )
 
-    # ── UI construction ───────────────────────────────────────────────────────
+    # -- UI construction -------------------------------------------------------
 
     def _build_ui(self):
         self.root.title("Dataset Browser")
@@ -259,7 +259,7 @@ class DatasetBrowser:
             bg=BG_PANEL, fg=FG_DIM, font=("Segoe UI", 9), anchor="w",
         ).pack(side="left", padx=8)
 
-    # ── Left panel ────────────────────────────────────────────────────────────
+    # -- Left panel ------------------------------------------------------------
 
     def _build_list_panel(self, parent: tk.Frame):
         # Split selector buttons
@@ -323,7 +323,7 @@ class DatasetBrowser:
 
         self._tree.bind("<<TreeviewSelect>>", self._on_case_select)
 
-    # ── Right panel ───────────────────────────────────────────────────────────
+    # -- Right panel -----------------------------------------------------------
 
     def _build_canvas_panel(self, parent: tk.Frame):
         # Info bar at the top
@@ -355,7 +355,7 @@ class DatasetBrowser:
         # Placeholder shown before any case is selected
         self._placeholder = tk.Label(
             parent,
-            text="← Select a case from the list",
+            text="<- Select a case from the list",
             bg=BG_DARK, fg="#aaaacc",
             font=("Segoe UI", 14),
         )
@@ -365,7 +365,7 @@ class DatasetBrowser:
         self._fig = plt.Figure(figsize=(8, 4.5), facecolor=BG_DARK)
         self._ax  = self._fig.add_subplot(111, facecolor=BG_DARK)
         self._canvas_widget = FigureCanvasTkAgg(self._fig, master=parent)
-        # nav bar hidden — we provide our own Prev / Next
+        # nav bar hidden - we provide our own Prev / Next
 
         self._canvas_widget.get_tk_widget().pack_forget()
         self._canvas_frame_packed = False
@@ -428,7 +428,7 @@ class DatasetBrowser:
         self.root.bind("<Up>",    lambda _: self._prev_case())
         self.root.bind("<Down>",  lambda _: self._next_case())
 
-    # ── Split selection ───────────────────────────────────────────────────────
+    # -- Split selection -------------------------------------------------------
 
     def _select_split(self, split: str):
         self._split     = split
@@ -483,7 +483,7 @@ class DatasetBrowser:
         rows.sort(key=lambda r: r["case"])
         return rows
 
-    # ── Case selection ────────────────────────────────────────────────────────
+    # -- Case selection --------------------------------------------------------
 
     def _on_case_select(self, _event=None):
         sel = self._tree.selection()
@@ -495,7 +495,7 @@ class DatasetBrowser:
         self._load_case(path)
 
     def _load_case(self, path: Path):
-        self._status_var.set(f"Loading {path.name} …")
+        self._status_var.set(f"Loading {path.name} ...")
         self.root.update_idletasks()
         try:
             data = np.load(path)
@@ -534,7 +534,7 @@ class DatasetBrowser:
         self._tree.selection_set(iid)
         self._tree.see(iid)
 
-    # ── Segment navigation ────────────────────────────────────────────────────
+    # -- Segment navigation ----------------------------------------------------
 
     def _prev_seg(self):
         if self._x is not None and self._seg_idx > 0:
@@ -579,7 +579,7 @@ class DatasetBrowser:
         finally:
             self._seg_slider_updating = False
 
-    # ── Plotting ──────────────────────────────────────────────────────────────
+    # -- Plotting --------------------------------------------------------------
 
     def _show_canvas(self):
         if not self._canvas_frame_packed:
@@ -627,7 +627,7 @@ class DatasetBrowser:
         ax.plot(t, ppg, color=PPG_COLOR, linewidth=0.8, antialiased=True)
 
         # Horizontal reference lines for SBP and DBP (normalised to signal range)
-        # — shown as coloured dashed annotations instead of separate axes
+        # - shown as coloured dashed annotations instead of separate axes
         ppg_min, ppg_max = float(ppg.min()), float(ppg.max())
         ppg_range = ppg_max - ppg_min if ppg_max != ppg_min else 1.0
         margin = ppg_range * 0.12
@@ -666,10 +666,10 @@ class DatasetBrowser:
         self._canvas_widget.draw_idle()
 
         self._status_var.set(
-            f"Case {cid}  ·  segment {idx + 1}/{n_segs}"
-            f"  ·  {n_samp} samples @ {self.target_hz} Hz"
-            f"  ·  SBP {sbp:.0f}  DBP {dbp:.0f} mmHg"
-            f"  ·  [↑↓ case  ←→ segment]"
+            f"Case {cid}  |  segment {idx + 1}/{n_segs}"
+            f"  |  {n_samp} samples @ {self.target_hz} Hz"
+            f"  |  SBP {sbp:.0f}  DBP {dbp:.0f} mmHg"
+            f"  |  [UpDown case  <--> segment]"
         )
 
         # Enable / disable nav buttons
@@ -677,7 +677,7 @@ class DatasetBrowser:
         self._next_btn.configure(state="normal" if idx < n_segs - 1 else "disabled")
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# -- Entry point ---------------------------------------------------------------
 
 def main():
     args = parse_args()

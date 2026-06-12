@@ -1,5 +1,5 @@
 """
-BPE Browser — inspect PPG segments with BPE model predictions.
+BPE Browser - inspect PPG segments with BPE model predictions.
 
 Browse preprocessed dataset segments and view live SBP/DBP predictions
 from any trained BPE model checkpoint.  Not intended for pulsewoq_resnet1d
@@ -10,11 +10,11 @@ Layout
   Left panel  : split selector + model selector + sortable case list
   Right panel : PPG waveform with GT / predicted BP annotation boxes
               + GT vs Predicted BP dumbbell chart
-  Info bar    : case ID · ground-truth SBP/DBP · predicted SBP/DBP · error
+  Info bar    : case ID | ground-truth SBP/DBP | predicted SBP/DBP | error
 
 Navigation
 ----------
-  ← / → : previous / next segment      ↑ / ↓ : previous / next case
+  <- / -> : previous / next segment      Up / Down : previous / next case
   Slider : drag to any segment          Jump  : type segment number + Enter
 
 Usage
@@ -54,7 +54,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import torch
 
 
-# ── Korean font (no-op if unavailable) ───────────────────────────────────────
+# -- Korean font (no-op if unavailable) ---------------------------------------
 def _set_cjk_font() -> None:
     available = {f.name for f in fm.fontManager.ttflist}
     for name in ("Malgun Gothic", "AppleGothic", "NanumGothic", "Gulim"):
@@ -70,7 +70,7 @@ SPLITS          = ("train", "val", "test")
 # pulsewoq_resnet1d has its own quality-weight browser (pulse-browser.py)
 EXCLUDED_MODELS = frozenset({"pulsewoq_resnet1d"})
 
-# ── Light colour palette ──────────────────────────────────────────────────────
+# -- Light colour palette ------------------------------------------------------
 BG_DARK   = "#ffffff"
 BG_MID    = "#f0f0f7"
 BG_PANEL  = "#e8e8f2"
@@ -90,7 +90,7 @@ SPLIT_BTN_ACTIVE   = {"bg": "#2255cc", "fg": "white",   "relief": "flat"}
 SPLIT_BTN_INACTIVE = {"bg": "#f0f0f7", "fg": "#666677", "relief": "flat"}
 
 
-# ── Model utilities ───────────────────────────────────────────────────────────
+# -- Model utilities -----------------------------------------------------------
 
 def find_available_models(models_dir: Path) -> list[str]:
     """Return sorted list of model names that have a best.pt checkpoint."""
@@ -153,7 +153,7 @@ def infer(model, ppg: np.ndarray, device: str) -> tuple[float, float]:
     return float(pred[0, 0].cpu()), float(pred[0, 1].cpu())
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+# -- CLI -----------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -175,7 +175,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--device", type=str, default="",
-        help="Inference device: 'cpu', 'cuda', 'cuda:0', … "
+        help="Inference device: 'cpu', 'cuda', 'cuda:0', ... "
              "(default: cuda if available, else cpu)",
     )
     p.add_argument(
@@ -185,7 +185,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-# ── Browser application ───────────────────────────────────────────────────────
+# -- Browser application -------------------------------------------------------
 
 class BPEBrowser:
     LIST_WIDTH = 320
@@ -216,7 +216,7 @@ class BPEBrowser:
         # Model state
         self._model: object | None = None
         self._model_name = ""
-        self._model_info = "Searching for checkpoints …"
+        self._model_info = "Searching for checkpoints ..."
 
         # App state
         self._split       = "train"
@@ -251,7 +251,7 @@ class BPEBrowser:
         self._select_split("train")
         self._start_metadata_worker()
 
-    # ── Model loading (background) ────────────────────────────────────────────
+    # -- Model loading (background) --------------------------------------------
 
     def _trigger_model_load(self, model_name: str) -> None:
         pt_path = self.models_dir / model_name / "best.pt"
@@ -262,7 +262,7 @@ class BPEBrowser:
 
         self._model      = None
         self._model_name = model_name
-        self._model_info = f"Loading {model_name} …"
+        self._model_info = f"Loading {model_name} ..."
         self._refresh_model_label()
 
         threading.Thread(
@@ -280,8 +280,8 @@ class BPEBrowser:
         self._model = model
         if model is not None:
             self._model_info = (
-                f"{model_name}  ·  epoch {epoch}"
-                f"  ·  val_loss {val_loss:.4f}  ·  {self.device}"
+                f"{model_name}  |  epoch {epoch}"
+                f"  |  val_loss {val_loss:.4f}  |  {self.device}"
             )
         else:
             self._model_info = f"Failed to load {model_name}"
@@ -298,7 +298,7 @@ class BPEBrowser:
         if name and name != self._model_name:
             self._trigger_model_load(name)
 
-    # ── File discovery ────────────────────────────────────────────────────────
+    # -- File discovery --------------------------------------------------------
 
     def _discover_files(self) -> None:
         for split in SPLITS:
@@ -319,7 +319,7 @@ class BPEBrowser:
         return dict(path=path, case=cid, segs=0, segs_text="...",
                     size="...", size_val=0.0, metadata_loaded=False)
 
-    # ── Metadata worker ───────────────────────────────────────────────────────
+    # -- Metadata worker -------------------------------------------------------
 
     def _start_metadata_worker(self) -> None:
         self._meta_total = sum(len(f) for f in self._npz_files.values())
@@ -367,7 +367,7 @@ class BPEBrowser:
             return
 
         if self._current_path is None:
-            self._status_var.set(f"Indexing {self._meta_done}/{self._meta_total}…")
+            self._status_var.set(f"Indexing {self._meta_done}/{self._meta_total}...")
         self.root.after(50, self._drain_metadata_queue)
 
     @staticmethod
@@ -385,10 +385,10 @@ class BPEBrowser:
         return dict(path=path, case=cid, segs=n_segs, segs_text=str(n_segs),
                     size=f"{size_kb:.0f} KB", size_val=size_kb, metadata_loaded=True)
 
-    # ── UI construction ───────────────────────────────────────────────────────
+    # -- UI construction -------------------------------------------------------
 
     def _build_ui(self) -> None:
-        self.root.title("BPE Browser — Blood Pressure Estimation")
+        self.root.title("BPE Browser - Blood Pressure Estimation")
         self.root.configure(bg=BG_DARK)
         self.root.geometry(f"{self.LIST_WIDTH + self.CANVAS_W}x{self.WIN_H}")
         self.root.minsize(860, 560)
@@ -418,7 +418,7 @@ class BPEBrowser:
             bg=BG_PANEL, fg=FG_DIM, font=("Segoe UI", 9), anchor="w",
         ).pack(side="left", padx=8)
 
-    # ── Left panel ────────────────────────────────────────────────────────────
+    # -- Left panel ------------------------------------------------------------
 
     def _build_list_panel(self, parent: tk.Frame) -> None:
         # Split buttons
@@ -506,7 +506,7 @@ class BPEBrowser:
             wraplength=self.LIST_WIDTH - 24,
         ).pack(anchor="w", padx=6, pady=(0, 4))
 
-    # ── Right panel ───────────────────────────────────────────────────────────
+    # -- Right panel -----------------------------------------------------------
 
     def _build_canvas_panel(self, parent: tk.Frame) -> None:
         # Info bar
@@ -532,7 +532,7 @@ class BPEBrowser:
         )
         self._dbp_label.pack(side="left", padx=(0, 8))
 
-        tk.Label(info_row, text="│", bg=BG_PANEL, fg=FG_DIM).pack(side="left")
+        tk.Label(info_row, text="|", bg=BG_PANEL, fg=FG_DIM).pack(side="left")
 
         self._pred_sbp_label = tk.Label(
             info_row, text="", bg=BG_PANEL, fg=PRED_SBP_CLR,
@@ -546,7 +546,7 @@ class BPEBrowser:
         )
         self._pred_dbp_label.pack(side="left", padx=(0, 8))
 
-        tk.Label(info_row, text="│", bg=BG_PANEL, fg=FG_DIM).pack(side="left")
+        tk.Label(info_row, text="|", bg=BG_PANEL, fg=FG_DIM).pack(side="left")
 
         self._err_sbp_label = tk.Label(
             info_row, text="", bg=BG_PANEL, font=("Segoe UI", 9),
@@ -560,12 +560,12 @@ class BPEBrowser:
 
         # Placeholder shown until a case is selected
         self._placeholder = tk.Label(
-            parent, text="← Select a case from the list",
+            parent, text="<- Select a case from the list",
             bg=BG_DARK, fg="#aaaacc", font=("Segoe UI", 14),
         )
         self._placeholder.pack(expand=True)
 
-        # Matplotlib figure — 2 vertically stacked axes
+        # Matplotlib figure - 2 vertically stacked axes
         self._fig = plt.Figure(figsize=(8.5, 6.5), facecolor=BG_DARK)
         gs = gridspec.GridSpec(
             2, 1, figure=self._fig,
@@ -634,7 +634,7 @@ class BPEBrowser:
         self.root.bind("<Up>",    lambda _: self._prev_case())
         self.root.bind("<Down>",  lambda _: self._next_case())
 
-    # ── Split selection ───────────────────────────────────────────────────────
+    # -- Split selection -------------------------------------------------------
 
     def _select_split(self, split: str) -> None:
         self._split       = split
@@ -667,16 +667,16 @@ class BPEBrowser:
         total = sum(r["segs"] for r in rows if r["metadata_loaded"])
         if known < n:
             self._count_var.set(
-                f"{n} cases · {known}/{n} indexed · {total:,} segs [{self._split}]")
+                f"{n} cases | {known}/{n} indexed | {total:,} segs [{self._split}]")
         else:
-            self._count_var.set(f"{n} cases · {total:,} segments [{self._split}]")
+            self._count_var.set(f"{n} cases | {total:,} segments [{self._split}]")
 
     def _sorted_rows(self) -> list[dict]:
         rows = self._rows[self._split][:]
         rows.sort(key=lambda r: r["case"])
         return rows
 
-    # ── Case selection ────────────────────────────────────────────────────────
+    # -- Case selection --------------------------------------------------------
 
     def _on_case_select(self, _event=None) -> None:
         sel = self._tree.selection()
@@ -687,7 +687,7 @@ class BPEBrowser:
             self._load_case(path)
 
     def _load_case(self, path: Path) -> None:
-        self._status_var.set(f"Loading {path.name} …")
+        self._status_var.set(f"Loading {path.name} ...")
         self.root.update_idletasks()
         try:
             data    = np.load(path)
@@ -726,7 +726,7 @@ class BPEBrowser:
         self._tree.selection_set(iid)
         self._tree.see(iid)
 
-    # ── Segment navigation ────────────────────────────────────────────────────
+    # -- Segment navigation ----------------------------------------------------
 
     def _prev_seg(self) -> None:
         if self._x is not None and self._seg_idx > 0:
@@ -770,7 +770,7 @@ class BPEBrowser:
         finally:
             self._slider_updating = False
 
-    # ── Canvas show / hide ────────────────────────────────────────────────────
+    # -- Canvas show / hide ----------------------------------------------------
 
     def _show_canvas(self) -> None:
         if not self._canvas_packed:
@@ -792,7 +792,7 @@ class BPEBrowser:
         self._seg_var.set("")
         self._configure_slider(1, enabled=False)
 
-    # ── Plotting ──────────────────────────────────────────────────────────────
+    # -- Plotting --------------------------------------------------------------
 
     @staticmethod
     def _err_color(e: float) -> str:
@@ -825,21 +825,21 @@ class BPEBrowser:
         self._dbp_label.configure(text=f"DBP {dbp_gt:.0f} mmHg")
 
         if sbp_pred is not None:
-            self._pred_sbp_label.configure(text=f"→ {sbp_pred:.0f}")
+            self._pred_sbp_label.configure(text=f"-> {sbp_pred:.0f}")
             self._pred_dbp_label.configure(text=f"/ {dbp_pred:.0f} mmHg  pred")
             err_sbp = sbp_pred - sbp_gt
             err_dbp = dbp_pred - dbp_gt
             self._err_sbp_label.configure(
-                text=f"ΔS {err_sbp:+.0f}", fg=self._err_color(err_sbp))
+                text=f"dS {err_sbp:+.0f}", fg=self._err_color(err_sbp))
             self._err_dbp_label.configure(
-                text=f"ΔD {err_dbp:+.0f}", fg=self._err_color(err_dbp))
+                text=f"dD {err_dbp:+.0f}", fg=self._err_color(err_dbp))
         else:
             self._pred_sbp_label.configure(text="")
             self._pred_dbp_label.configure(text="")
             self._err_sbp_label.configure(text="no model", fg=FG_DIM)
             self._err_dbp_label.configure(text="")
 
-        # ── PPG waveform ──────────────────────────────────────────────────────
+        # -- PPG waveform ------------------------------------------------------
         ax = self._ax_ppg
         ax.cla()
         ax.set_facecolor(BG_DARK)
@@ -863,7 +863,7 @@ class BPEBrowser:
         gt_str   = f"GT   SBP {sbp_gt:.0f}   DBP {dbp_gt:.0f} mmHg"
         pred_str = (
             f"Pred  SBP {sbp_pred:.0f}   DBP {dbp_pred:.0f} mmHg"
-            if sbp_pred is not None else "Pred  —"
+            if sbp_pred is not None else "Pred  -"
         )
         ax.text(
             0.99, 0.97, gt_str,
@@ -885,7 +885,7 @@ class BPEBrowser:
         )
         ax.set_title("PPG Waveform", color=FG_NORM, fontsize=9, pad=4)
 
-        # ── GT vs Predicted BP dumbbell chart ─────────────────────────────────
+        # -- GT vs Predicted BP dumbbell chart ---------------------------------
         ax_bp = self._ax_bp
         ax_bp.cla()
         ax_bp.set_facecolor(BG_DARK)
@@ -925,7 +925,7 @@ class BPEBrowser:
                     label=f"Pred {lbl} {pred:.0f}",
                 )
 
-                # Value labels — offset away from dots
+                # Value labels - offset away from dots
                 ax_bp.text(
                     pos + 0.10, gt,   f"{gt:.0f}",
                     ha="left", va="center", color=cgt,   fontsize=9, zorder=8,
@@ -938,7 +938,7 @@ class BPEBrowser:
                 # Error annotation at midpoint between the two dots
                 mid_y = (gt + pred) / 2
                 ax_bp.text(
-                    pos - 0.10, mid_y, f"Δ{err:+.0f}",
+                    pos - 0.10, mid_y, f"d{err:+.0f}",
                     ha="right", va="center",
                     color=self._err_color(err),
                     fontsize=9, fontweight="bold", zorder=9,
@@ -974,7 +974,7 @@ class BPEBrowser:
             framealpha=0.0, labelcolor=FG_DIM,
         )
         ax_bp.set_title(
-            "GT vs Predicted BP  ·  ● GT  ◆ Pred  ·  Δ = error (green ≤5, amber ≤10, red >10 mmHg)",
+            "GT vs Predicted BP  |  o GT  * Pred  |  d = error (green <=5, amber <=10, red >10 mmHg)",
             color=FG_NORM, fontsize=9, pad=4,
         )
 
@@ -991,22 +991,22 @@ class BPEBrowser:
             err_sbp = sbp_pred - sbp_gt
             err_dbp = dbp_pred - dbp_gt
             err_str = (
-                f"  ·  ΔS {err_sbp:+.0f}"
-                f"  ΔD {err_dbp:+.0f} mmHg"
+                f"  |  dS {err_sbp:+.0f}"
+                f"  dD {err_dbp:+.0f} mmHg"
             )
         self._status_var.set(
-            f"Case {cid}  ·  seg {idx + 1}/{n_segs}"
-            f"  ·  {n_samp} samples @ {self.target_hz} Hz"
-            f"  ·  SBP {sbp_gt:.0f}  DBP {dbp_gt:.0f} mmHg"
+            f"Case {cid}  |  seg {idx + 1}/{n_segs}"
+            f"  |  {n_samp} samples @ {self.target_hz} Hz"
+            f"  |  SBP {sbp_gt:.0f}  DBP {dbp_gt:.0f} mmHg"
             + err_str
-            + "  ·  [↑↓ case  ←→ seg]"
+            + "  |  [UpDown case  <--> seg]"
         )
 
         self._prev_btn.configure(state="normal" if idx > 0          else "disabled")
         self._next_btn.configure(state="normal" if idx < n_segs - 1 else "disabled")
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# -- Entry point ---------------------------------------------------------------
 
 def main() -> None:
     args = parse_args()

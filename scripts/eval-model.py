@@ -4,10 +4,10 @@ Evaluate a trained BPE model on the held-out test set.
 Loads best.pt from a run directory, runs inference over the test split, and
 writes evaluation results to the same directory:
 
-  eval_results.json     — summary metrics (MAE, RMSE, ME, SD; BHS grade; AAMI)
-  eval_plot.png         — predicted vs actual scatter plots for SBP and DBP
-  error_hist.png        — error distribution histograms for SBP and DBP
-  bland_altman.png      — Bland-Altman plots for SBP and DBP
+  eval_results.json     - summary metrics (MAE, RMSE, ME, SD; BHS grade; AAMI)
+  eval_plot.png         - predicted vs actual scatter plots for SBP and DBP
+  error_hist.png        - error distribution histograms for SBP and DBP
+  bland_altman.png      - Bland-Altman plots for SBP and DBP
 
 Usage:
     uv run python scripts/eval-model.py <run_dir> [OPTIONS]
@@ -77,7 +77,7 @@ def parse_args() -> argparse.Namespace:
         "--no-normalize", action="store_true",
         help="Skip per-segment z-score normalization of PPG",
     )
-    # ── Duo mode ──────────────────────────────────────────────────────────────
+    # -- Duo mode --------------------------------------------------------------
     p.add_argument(
         "--duo", action="store_true",
         help="Enable duo evaluation mode (two-model ensemble with rejection)",
@@ -105,7 +105,7 @@ def resolve_device(spec: str) -> torch.device:
     return torch.device(spec)
 
 
-# ── Metrics ───────────────────────────────────────────────────────────────────
+# -- Metrics -------------------------------------------------------------------
 
 def compute_metrics(pred: np.ndarray, true: np.ndarray) -> dict:
     """Return a dict of clinical BP estimation metrics for one channel."""
@@ -115,13 +115,13 @@ def compute_metrics(pred: np.ndarray, true: np.ndarray) -> dict:
     sd   = float(np.std(err, ddof=1))
     rmse = float(np.sqrt(np.mean(err ** 2)))
 
-    # BHS cumulative error distribution (≤5, ≤10, ≤15 mmHg)
+    # BHS cumulative error distribution (<=5, <=10, <=15 mmHg)
     n = len(err)
     bhs_5  = float(np.sum(np.abs(err) <= 5)  / n * 100)
     bhs_10 = float(np.sum(np.abs(err) <= 10) / n * 100)
     bhs_15 = float(np.sum(np.abs(err) <= 15) / n * 100)
 
-    # BHS grade: A ≥60%/85%/95%, B ≥50%/75%/90%, C ≥40%/65%/85%, D below C
+    # BHS grade: A >=60%/85%/95%, B >=50%/75%/90%, C >=40%/65%/85%, D below C
     if bhs_5 >= 60 and bhs_10 >= 85 and bhs_15 >= 95:
         bhs_grade = "A"
     elif bhs_5 >= 50 and bhs_10 >= 75 and bhs_15 >= 90:
@@ -131,7 +131,7 @@ def compute_metrics(pred: np.ndarray, true: np.ndarray) -> dict:
     else:
         bhs_grade = "D"
 
-    # AAMI criterion: |ME| ≤ 5 mmHg and SD ≤ 8 mmHg
+    # AAMI criterion: |ME| <= 5 mmHg and SD <= 8 mmHg
     aami_pass = abs(me) <= 5.0 and sd <= 8.0
 
     return {
@@ -148,7 +148,7 @@ def compute_metrics(pred: np.ndarray, true: np.ndarray) -> dict:
     }
 
 
-# ── Plots ─────────────────────────────────────────────────────────────────────
+# -- Plots ---------------------------------------------------------------------
 
 def plot_scatter(
     pred_sbp: np.ndarray,
@@ -235,9 +235,9 @@ def plot_bland_altman(
         ax.axhline(loa_upper, color="#FF9800", linewidth=1.2, linestyle="--",
                    label=f"+1.96 SD = {loa_upper:.2f} mmHg")
         ax.axhline(loa_lower, color="#FF9800", linewidth=1.2, linestyle="--",
-                   label=f"−1.96 SD = {loa_lower:.2f} mmHg")
+                   label=f"-1.96 SD = {loa_lower:.2f} mmHg")
         ax.set_xlabel(f"Mean of Actual and Predicted {label} (mmHg)")
-        ax.set_ylabel(f"Predicted − Actual {label} (mmHg)")
+        ax.set_ylabel(f"Predicted - Actual {label} (mmHg)")
         ax.set_title(f"{label}: Bland-Altman Plot")
         ax.legend(fontsize=8)
         ax.grid(True, alpha=0.3)
@@ -247,7 +247,7 @@ def plot_bland_altman(
     plt.close(fig)
 
 
-# ── Per-case stats ────────────────────────────────────────────────────────────
+# -- Per-case stats ------------------------------------------------------------
 
 def compute_per_case_stats(
     preds: np.ndarray,
@@ -291,7 +291,7 @@ def compute_per_case_stats(
     }
 
 
-# ── Inference ─────────────────────────────────────────────────────────────────
+# -- Inference -----------------------------------------------------------------
 
 def run_inference(
     model: torch.nn.Module,
@@ -365,7 +365,7 @@ def run_duo_inference(
     return preds_a, preds_b, targets, elapsed_a, elapsed_b
 
 
-# ── Shared helper ─────────────────────────────────────────────────────────────
+# -- Shared helper -------------------------------------------------------------
 
 def _print_and_save(
     run_dir: Path,
@@ -433,7 +433,7 @@ def _print_and_save(
     print(f"Saved: {run_dir / hist_name}")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     args = parse_args()
@@ -490,7 +490,7 @@ def _main_single(args: argparse.Namespace) -> None:
         num_workers=4, pin_memory=device.type == "cuda",
     )
 
-    print("Running inference …")
+    print("Running inference ...")
     preds, targets, inference_sec = run_inference(model, loader, device)
 
     case_m = compute_per_case_stats(preds, targets, test_ds._segs, test_ds._files)
@@ -578,7 +578,7 @@ def _main_duo(args: argparse.Namespace) -> None:
     print(f"Output dir    : {out_dir}")
     print(f"Device        : {device}")
 
-    # ── Load both models ──────────────────────────────────────────────────────
+    # -- Load both models ------------------------------------------------------
     try:
         model_a, _ = _load_model(models_dir / model_a_id, device)
         model_b, _ = _load_model(models_dir / model_b_id, device)
@@ -588,7 +588,7 @@ def _main_duo(args: argparse.Namespace) -> None:
 
     print(f"Loaded {model_a_id} and {model_b_id}")
 
-    # ── Test dataset ──────────────────────────────────────────────────────────
+    # -- Test dataset ----------------------------------------------------------
     test_dir = args.dataset_dir / "test"
     try:
         test_ds = PPGDataset(test_dir, normalize=not args.no_normalize, preload=False)
@@ -604,8 +604,8 @@ def _main_duo(args: argparse.Namespace) -> None:
         num_workers=4, pin_memory=device.type == "cuda",
     )
 
-    # ── Inference ─────────────────────────────────────────────────────────────
-    print("Running inference for both models …")
+    # -- Inference -------------------------------------------------------------
+    print("Running inference for both models ...")
     preds_a, preds_b, targets, elapsed_a, elapsed_b = run_duo_inference(
         model_a, model_b, loader, device
     )
@@ -624,7 +624,7 @@ def _main_duo(args: argparse.Namespace) -> None:
     print(f"  Accepted         : {n_accepted:,}  ({accept_rate:.1f}%)")
     print(f"  Rejected         : {n_rejected:,}  ({100 - accept_rate:.1f}%)")
 
-    # ── Disagreement distribution ─────────────────────────────────────────────
+    # -- Disagreement distribution ---------------------------------------------
     print()
     sbp_diff_mean = float(np.mean(diff[:, 0]))
     dbp_diff_mean = float(np.mean(diff[:, 1]))
@@ -633,7 +633,7 @@ def _main_duo(args: argparse.Namespace) -> None:
     print(f"  SBP inter-model diff  mean={sbp_diff_mean:.2f} mmHg  p95={sbp_diff_p95:.2f} mmHg")
     print(f"  DBP inter-model diff  mean={dbp_diff_mean:.2f} mmHg  p95={dbp_diff_p95:.2f} mmHg")
 
-    # ── Metrics: ALL segments ─────────────────────────────────────────────────
+    # -- Metrics: ALL segments -------------------------------------------------
     sbp_all_m = compute_metrics(avg_preds[:, 0], targets[:, 0])
     dbp_all_m = compute_metrics(avg_preds[:, 1], targets[:, 1])
 
@@ -653,7 +653,7 @@ def _main_duo(args: argparse.Namespace) -> None:
         else:
             print(f"  {key:<16}  {sv:>12{fmt}}  {dv:>12{fmt}}")
 
-    # ── Metrics: ACCEPTED segments ────────────────────────────────────────────
+    # -- Metrics: ACCEPTED segments --------------------------------------------
     if n_accepted > 0:
         acc_preds   = avg_preds[accepted]
         acc_targets = targets[accepted]
@@ -676,9 +676,9 @@ def _main_duo(args: argparse.Namespace) -> None:
             else:
                 print(f"  {key:<16}  {sv:>14{fmt}}  {dv:>14{fmt}}")
 
-        # ── Improvement summary ───────────────────────────────────────────────
+        # -- Improvement summary -----------------------------------------------
         print()
-        print("  Improvement (all → accepted):")
+        print("  Improvement (all -> accepted):")
         for bp, m_all, m_acc in [("SBP", sbp_all_m, sbp_acc_m),
                                    ("DBP", dbp_all_m, dbp_acc_m)]:
             d_mae  = m_all["mae"]  - m_acc["mae"]
@@ -687,9 +687,9 @@ def _main_duo(args: argparse.Namespace) -> None:
             print(f"    {bp}: MAE {d_mae:+.2f}  SD {d_sd:+.2f}  RMSE {d_rmse:+.2f} mmHg")
     else:
         sbp_acc_m = dbp_acc_m = None
-        print("\n  (no segments accepted — all rejected)")
+        print("\n  (no segments accepted - all rejected)")
 
-    # ── Timing ────────────────────────────────────────────────────────────────
+    # -- Timing ----------------------------------------------------------------
     total_elapsed = elapsed_a + elapsed_b
     avg_ms_total  = total_elapsed / n_total * 1000
     avg_ms_a      = elapsed_a / n_total * 1000
@@ -698,7 +698,7 @@ def _main_duo(args: argparse.Namespace) -> None:
     print(f"  Inference time: {model_a_id} {avg_ms_a:.4f} ms/sample + "
           f"{model_b_id} {avg_ms_b:.4f} ms/sample = {avg_ms_total:.4f} ms/sample total")
 
-    # ── Save results ──────────────────────────────────────────────────────────
+    # -- Save results ----------------------------------------------------------
     out_dir.mkdir(parents=True, exist_ok=True)
 
     results = {
@@ -776,7 +776,7 @@ def _plot_duo_diff(
         ax.hist(d[~accepted], bins=60, color="#F44336", alpha=0.7, label="Rejected")
         ax.axvline(threshold, color="black", linewidth=1.2, linestyle="--",
                    label=f"Threshold = {threshold} mmHg")
-        ax.set_xlabel(f"|{label}_A − {label}_B| (mmHg)")
+        ax.set_xlabel(f"|{label}_A - {label}_B| (mmHg)")
         ax.set_ylabel("Count")
         ax.set_title(f"{label} Inter-model Disagreement")
         ax.legend(fontsize=9)
