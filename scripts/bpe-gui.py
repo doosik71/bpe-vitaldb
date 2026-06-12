@@ -141,6 +141,33 @@ PIPELINE = [
         ],
     },
     {
+        "id": "psd_browse",
+        "label": "PSD Browser",
+        "category": "Dataset",
+        "script": "psd-browser.py",
+        "desc": "Interactive GUI browser for PPG waveform PSD analysis and power_ratio inspection.",
+        "gui": True,
+        "params": [
+            ("dataset-dir", "dir", "data/dataset", "Root dataset directory"),
+            ("target-hz",   "int", "125",           "PPG sample rate used when building the dataset"),
+            ("nperseg",     "int", "256",           "Welch segment length"),
+        ],
+    },
+    {
+        "id": "spectro_browse",
+        "label": "Spectrogram Browser",
+        "category": "Dataset",
+        "script": "spectro-browser.py",
+        "desc": "Interactive GUI browser for PPG spectrogram analysis and time-varying frequency inspection.",
+        "gui": True,
+        "params": [
+            ("dataset-dir", "dir", "data/dataset", "Root dataset directory"),
+            ("target-hz",   "int", "125",           "PPG sample rate used when building the dataset"),
+            ("nperseg",     "int", "128",           "Analysis window length for Welch / spectrogram"),
+            ("noverlap",    "int", "64",            "Overlap between adjacent spectrogram windows"),
+        ],
+    },
+    {
         "id": "ds_stats",
         "label": "Dataset Statistics",
         "category": "Dataset",
