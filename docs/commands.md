@@ -67,10 +67,6 @@ bin/print-model --model minception        > data/models-v1/minception/struct.txt
 bin/print-model --model mtae              > data/models-v1/mtae/struct.txt
 bin/print-model --model mtae_tr           > data/models-v1/mtae_tr/struct.txt
 bin/print-model --model naive             > data/models-v1/naive/struct.txt
-bin/print-model --model pulse_resnet1d    > data/models-v1/pulse_resnet1d/struct.txt
-bin/print-model --model pulsew_resnet1d   > data/models-v1/pulsew_resnet1d/struct.txt
-bin/print-model --model pulsewo_resnet1d  > data/models-v1/pulsewo_resnet1d/struct.txt
-bin/print-model --model pulsewoq_resnet1d > data/models-v1/pulsewoq_resnet1d/struct.txt
 bin/print-model --model resnet1d          > data/models-v1/resnet1d/struct.txt
 bin/print-model --model resnet1d_micro    > data/models-v1/resnet1d_micro/struct.txt
 bin/print-model --model resnet1d_mini     > data/models-v1/resnet1d_mini/struct.txt
@@ -113,10 +109,6 @@ bin/train-status  data/models-v1/minception
 bin/train-status  data/models-v1/mtae
 bin/train-status  data/models-v1/mtae_tr
 bin/train-status  data/models-v1/naive
-bin/train-status  data/models-v1/pulse_resnet1d
-bin/train-status  data/models-v1/pulsew_resnet1d
-bin/train-status  data/models-v1/pulsewo_resnet1d
-bin/train-status  data/models-v1/pulsewoq_resnet1d
 bin/train-status  data/models-v1/resnet1d
 bin/train-status  data/models-v1/resnet1d_micro
 bin/train-status  data/models-v1/resnet1d_mini
@@ -147,6 +139,8 @@ bin/eval-model data/models/resnet1d_mini
 bin/eval-model data/models/resnet1d_tiny
 bin/eval-model data/models/st_resnet
 bin/eval-model data/models/xresnet1d
+
+bin/eval-all-model --dataset-dir data/dataset-v1 --models-dir data/models-v1
 ```
 
 ## 평가 결과 수집
@@ -154,4 +148,7 @@ bin/eval-model data/models/xresnet1d
 ```bash
 bin/collect-result
 bin/generate-overview
+
+bin/collect-result --models-dir data/models-v1 --images-dir data/images-v1 --logs-dir data/logs-v1
+bin/generate-overview --models-dir data/models-v1 --output-dir data/images-v1
 ```

@@ -5,7 +5,6 @@ from bpe.models.resnet1d import BottleneckBlock1D, ResNet1D
 
 
 @register_model("xresnet1d")
-@register_model("xresnet1d101")
 class XResNet1D101(ResNet1D):
     """Deeper ResNet-101-like 1D model for stronger baselines."""
 

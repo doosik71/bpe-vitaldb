@@ -68,8 +68,8 @@ def parse_args() -> argparse.Namespace:
         help="Root directory containing model subdirectories (default: data/models)",
     )
     p.add_argument(
-        "--output-dir", type=Path, default=Path("images"),
-        help="Directory to write graph files (default: images)",
+        "--output-dir", type=Path, default=Path("data/images"),
+        help="Directory to write graph files (default: data/images)",
     )
     p.add_argument(
         "--format", choices=["png", "html", "both"], default="both",
@@ -96,6 +96,7 @@ def load_model_data(models_dir: Path) -> list[dict]:
 
         struct_path = model_dir / "struct.txt"
         if not struct_path.exists():
+            print(f"  [warn] no struct.txt found for {model_dir.name}")
             continue
 
         n_params = _parse_param_count(struct_path)

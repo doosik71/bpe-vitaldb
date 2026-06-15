@@ -16,7 +16,7 @@ Files collected:
 
 Usage:
     uv run python scripts/collect-result.py
-    uv run python scripts/collect-result.py --models-dir data/models --images-dir images --logs-dir logs --pt-dir models
+    uv run python scripts/collect-result.py --models-dir data/models --images-dir data/images --logs-dir data/logs
 """
 
 import argparse
@@ -45,12 +45,12 @@ def parse_args() -> argparse.Namespace:
         help="Root directory containing model run subdirectories (default: data/models)",
     )
     p.add_argument(
-        "--images-dir", type=Path, default=Path("images"),
-        help="Output directory for PNG images (default: images)",
+        "--images-dir", type=Path, default=Path("data/images"),
+        help="Output directory for PNG images (default: data/images)",
     )
     p.add_argument(
-        "--logs-dir", type=Path, default=Path("logs"),
-        help="Output directory for eval_results.json and metrics.csv (default: logs)",
+        "--logs-dir", type=Path, default=Path("data/logs"),
+        help="Output directory for eval_results.json and metrics.csv (default: data/logs)",
     )
     return p.parse_args()
 

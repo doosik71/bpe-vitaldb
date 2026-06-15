@@ -29,7 +29,6 @@ class SignalBranch(nn.Module):
 
 
 @register_model("st_resnet")
-@register_model("spectro_temporal_resnet")
 class SpectroTemporalResNet(nn.Module):
     """Three-branch residual model over PPG, VPG, and APG channels."""
 
