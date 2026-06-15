@@ -6,6 +6,14 @@
 bin/construct-dataset
 ```
 
+## 데이터셋 분석
+
+```bash
+bin/dataset-statistic
+
+bin/dataset-statistic --dataset-dir data/dataset-v1
+```
+
 ## 모델 학습
 
 ```bash
