@@ -11,6 +11,7 @@ from bpe.models.minception import MInception
 from bpe.models.mtae import MTAE
 from bpe.models.mtae_tr import MTAE_TR
 from bpe.models.naive import NaiveConstant
+from bpe.models.pctn import PCTN
 from bpe.models.resnet1d import ResNet1D
 from bpe.models.resnet1d_micro import ResNet1DMicro
 from bpe.models.resnet1d_mini import ResNet1DMini
@@ -44,6 +45,7 @@ __all__ = [
     "MTAE",
     "MTAE_TR",
     "NaiveConstant",
+    "PCTN",
     # "PulseResNet1D",
     # "PulseWResNet1D",
     # "PulseWOResNet1D",

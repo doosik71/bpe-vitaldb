@@ -295,6 +295,7 @@ Available model architectures:
 | `minception`        | Multi-scale Inception 1D CNN                                            |    134 | 440.7 K |
 | `mtae_tr`           | MTAE with Transformer encoder/decoder (MAE-style)                       |     93 | 109.4 K |
 | `mtae`              | Multi-Task AutoEncoder (reconstruction + BP head)                       |     37 | 119.5 K |
+| `pctn`              | Parallel CNN-Transformer (ResNet-50 stem + CBAM fusion) (Tian et al., 2025) | 108 |  5.13 M |
 | `pulsewoq_resnet1d` | Overlapping-segment ResNet with explicit quality supervision and output |     38 |  30.1 K |
 | `resnet1d_micro`    | ResNet1D ~10 % depth (1 stage × 1 block)                                |     21 |  15.1 K |
 | `resnet1d_mini`     | ResNet1D 50 % depth (4 stages × 1 block)                                |     60 | 964.4 K |
