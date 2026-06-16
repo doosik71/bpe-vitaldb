@@ -162,7 +162,9 @@ class DatasetBrowser:
     def _metadata_worker(self):
         for split in SPLITS:
             files = self._npz_files[split]
-            for path in tqdm(files, desc=f"Indexing {split}", unit="file"):
+            for path in tqdm(files, desc=f"Indexing {split}",
+                             unit="file",
+                             dynamic_ncols=True):
                 self._metadata_queue.put(("row", split, path, self._file_row(path)))
         self._metadata_queue.put(("done", None, None, None))
 

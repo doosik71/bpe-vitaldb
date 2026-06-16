@@ -179,7 +179,11 @@ def main():
             executor.submit(download_vital_file, cid, output_dir, resume): cid
             for cid in caseids
         }
-        with tqdm(total=len(caseids), unit="case", desc="Downloading", ascii=" -+=") as pbar:
+        with tqdm(total=len(caseids),
+                  unit="case",
+                  desc="Downloading",
+                  ascii=" -+=",
+                  dynamic_ncols=True) as pbar:
             for future in as_completed(futures):
                 caseid, ok, msg = future.result()
                 if msg == "skip":

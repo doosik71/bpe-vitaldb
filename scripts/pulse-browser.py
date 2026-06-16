@@ -352,7 +352,10 @@ class PulseBrowser:
 
     def _metadata_worker(self) -> None:
         for split in SPLITS:
-            for path in tqdm(self._npz_files[split], desc=f"Indexing {split}", unit="file"):
+            for path in tqdm(self._npz_files[split],
+                             desc=f"Indexing {split}",
+                             unit="file",
+                             dynamic_ncols=True):
                 self._meta_queue.put(("row", split, path, self._file_row(path)))
         self._meta_queue.put(("done", None, None, None))
 

@@ -4,14 +4,16 @@
 
 ```bash
 bin/construct-dataset
+uv run python scripts/construct-dataset-v1.py
+uv run python scripts/construct-dataset-v2.py
 ```
 
 ## 데이터셋 분석
 
 ```bash
 bin/dataset-statistic
-
 bin/dataset-statistic --dataset-dir data/dataset-v1
+bin/dataset-statistic --dataset-dir data/dataset-v2
 ```
 
 ## 모델 학습
@@ -28,10 +30,7 @@ bin/train-model --model minception
 bin/train-model --model mtae
 bin/train-model --model mtae_tr
 bin/train-model --model naive
-bin/train-model --model pulse_resnet1d
-bin/train-model --model pulsew_resnet1d
-bin/train-model --model pulsewo_resnet1d
-bin/train-model --model pulsewoq_resnet1d
+bin/train-model --model pctn
 bin/train-model --model resnet1d
 bin/train-model --model resnet1d_micro
 bin/train-model --model resnet1d_mini
@@ -40,6 +39,7 @@ bin/train-model --model st_resnet
 bin/train-model --model xresnet1d
 
 bin/train-all-model --dataset-dir data/dataset-v1 --output-dir data/models-v1
+bin/train-all-model --dataset-dir data/dataset-v2 --output-dir data/models-v2
 ```
 
 ## 모델 구조 출력
@@ -56,10 +56,7 @@ bin/print-model --model minception        > data/models/minception/struct.txt
 bin/print-model --model mtae              > data/models/mtae/struct.txt
 bin/print-model --model mtae_tr           > data/models/mtae_tr/struct.txt
 bin/print-model --model naive             > data/models/naive/struct.txt
-bin/print-model --model pulse_resnet1d    > data/models/pulse_resnet1d/struct.txt
-bin/print-model --model pulsew_resnet1d   > data/models/pulsew_resnet1d/struct.txt
-bin/print-model --model pulsewo_resnet1d  > data/models/pulsewo_resnet1d/struct.txt
-bin/print-model --model pulsewoq_resnet1d > data/models/pulsewoq_resnet1d/struct.txt
+bin/print-model --model pctn              > data/models/pctn/struct.txt
 bin/print-model --model resnet1d          > data/models/resnet1d/struct.txt
 bin/print-model --model resnet1d_micro    > data/models/resnet1d_micro/struct.txt
 bin/print-model --model resnet1d_mini     > data/models/resnet1d_mini/struct.txt
@@ -69,7 +66,7 @@ bin/print-model --model xresnet1d         > data/models/xresnet1d/struct.txt
 
 bin/print-model --model acfa              > data/models-v1/acfa/struct.txt
 bin/print-model --model ae_lstm           > data/models-v1/ae_lstm/struct.txt
-bin/print-model --model bpnet_cf           > data/models-v1/bpnet_cf/struct.txt
+bin/print-model --model bpnet_cf          > data/models-v1/bpnet_cf/struct.txt
 bin/print-model --model cnn_bilstm_at     > data/models-v1/cnn_bilstm_at/struct.txt
 bin/print-model --model conv_reg          > data/models-v1/conv_reg/struct.txt
 bin/print-model --model conv_reg_at       > data/models-v1/conv_reg_at/struct.txt
@@ -78,12 +75,32 @@ bin/print-model --model minception        > data/models-v1/minception/struct.txt
 bin/print-model --model mtae              > data/models-v1/mtae/struct.txt
 bin/print-model --model mtae_tr           > data/models-v1/mtae_tr/struct.txt
 bin/print-model --model naive             > data/models-v1/naive/struct.txt
+bin/print-model --model pctn              > data/models-v1/pctn/struct.txt
 bin/print-model --model resnet1d          > data/models-v1/resnet1d/struct.txt
 bin/print-model --model resnet1d_micro    > data/models-v1/resnet1d_micro/struct.txt
 bin/print-model --model resnet1d_mini     > data/models-v1/resnet1d_mini/struct.txt
 bin/print-model --model resnet1d_tiny     > data/models-v1/resnet1d_tiny/struct.txt
 bin/print-model --model st_resnet         > data/models-v1/st_resnet/struct.txt
 bin/print-model --model xresnet1d         > data/models-v1/xresnet1d/struct.txt
+
+bin/print-model --model acfa              > data/models-v2/acfa/struct.txt
+bin/print-model --model ae_lstm           > data/models-v2/ae_lstm/struct.txt
+bin/print-model --model bpnet_cf          > data/models-v2/bpnet_cf/struct.txt
+bin/print-model --model cnn_bilstm_at     > data/models-v2/cnn_bilstm_at/struct.txt
+bin/print-model --model conv_reg          > data/models-v2/conv_reg/struct.txt
+bin/print-model --model conv_reg_at       > data/models-v2/conv_reg_at/struct.txt
+bin/print-model --model conv_reg_ds       > data/models-v2/conv_reg_ds/struct.txt
+bin/print-model --model minception        > data/models-v2/minception/struct.txt
+bin/print-model --model mtae              > data/models-v2/mtae/struct.txt
+bin/print-model --model mtae_tr           > data/models-v2/mtae_tr/struct.txt
+bin/print-model --model naive             > data/models-v2/naive/struct.txt
+bin/print-model --model pctn              > data/models-v2/pctn/struct.txt
+bin/print-model --model resnet1d          > data/models-v2/resnet1d/struct.txt
+bin/print-model --model resnet1d_micro    > data/models-v2/resnet1d_micro/struct.txt
+bin/print-model --model resnet1d_mini     > data/models-v2/resnet1d_mini/struct.txt
+bin/print-model --model resnet1d_tiny     > data/models-v2/resnet1d_tiny/struct.txt
+bin/print-model --model st_resnet         > data/models-v2/st_resnet/struct.txt
+bin/print-model --model xresnet1d         > data/models-v2/xresnet1d/struct.txt
 ```
 
 ## 모델 Training Status
@@ -100,10 +117,7 @@ bin/train-status  data/models/minception
 bin/train-status  data/models/mtae
 bin/train-status  data/models/mtae_tr
 bin/train-status  data/models/naive
-bin/train-status  data/models/pulse_resnet1d
-bin/train-status  data/models/pulsew_resnet1d
-bin/train-status  data/models/pulsewo_resnet1d
-bin/train-status  data/models/pulsewoq_resnet1d
+bin/train-status  data/models/pctn
 bin/train-status  data/models/resnet1d
 bin/train-status  data/models/resnet1d_micro
 bin/train-status  data/models/resnet1d_mini
@@ -122,12 +136,32 @@ bin/train-status  data/models-v1/minception
 bin/train-status  data/models-v1/mtae
 bin/train-status  data/models-v1/mtae_tr
 bin/train-status  data/models-v1/naive
+bin/train-status  data/models-v1/pctn
 bin/train-status  data/models-v1/resnet1d
 bin/train-status  data/models-v1/resnet1d_micro
 bin/train-status  data/models-v1/resnet1d_mini
 bin/train-status  data/models-v1/resnet1d_tiny
 bin/train-status  data/models-v1/st_resnet
 bin/train-status  data/models-v1/xresnet1d
+
+bin/train-status  data/models-v2/acfa
+bin/train-status  data/models-v2/ae_lstm
+bin/train-status  data/models-v2/bpnet_cf
+bin/train-status  data/models-v2/cnn_bilstm_at
+bin/train-status  data/models-v2/conv_reg
+bin/train-status  data/models-v2/conv_reg_at
+bin/train-status  data/models-v2/conv_reg_ds
+bin/train-status  data/models-v2/minception
+bin/train-status  data/models-v2/mtae
+bin/train-status  data/models-v2/mtae_tr
+bin/train-status  data/models-v2/naive
+bin/train-status  data/models-v2/pctn
+bin/train-status  data/models-v2/resnet1d
+bin/train-status  data/models-v2/resnet1d_micro
+bin/train-status  data/models-v2/resnet1d_mini
+bin/train-status  data/models-v2/resnet1d_tiny
+bin/train-status  data/models-v2/st_resnet
+bin/train-status  data/models-v2/xresnet1d
 ```
 
 ## 모델 평가
@@ -144,9 +178,7 @@ bin/eval-model data/models/minception
 bin/eval-model data/models/mtae
 bin/eval-model data/models/mtae_tr
 bin/eval-model data/models/naive
-bin/eval-model data/models/pulse_resnet1d
-bin/eval-model data/models/pulsew_resnet1d
-bin/eval-model data/models/pulsewo_resnet1d
+bin/eval-model data/models/pctn
 bin/eval-model data/models/resnet1d
 bin/eval-model data/models/resnet1d_micro
 bin/eval-model data/models/resnet1d_mini
@@ -155,14 +187,18 @@ bin/eval-model data/models/st_resnet
 bin/eval-model data/models/xresnet1d
 
 bin/eval-all-model --dataset-dir data/dataset-v1 --models-dir data/models-v1
+bin/eval-all-model --dataset-dir data/dataset-v2 --models-dir data/models-v2
 ```
 
 ## 평가 결과 수집
 
 ```bash
 bin/collect-result
-bin/generate-overview
 
 bin/collect-result --models-dir data/models-v1 --images-dir data/images-v1 --logs-dir data/logs-v1
+bin/collect-result --models-dir data/models-v2 --images-dir data/images-v2 --logs-dir data/logs-v2
+
+bin/generate-overview
 bin/generate-overview --models-dir data/models-v1 --output-dir data/images-v1
+bin/generate-overview --models-dir data/models-v2 --output-dir data/images-v2
 ```

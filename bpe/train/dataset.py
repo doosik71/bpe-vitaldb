@@ -65,7 +65,7 @@ class PPGDataset(Dataset):
         if not npz_files:
             raise FileNotFoundError(f"No .npz files found in {split_dir}")
 
-        for path in tqdm(npz_files, desc=f"Indexing {split_dir.name}", leave=False):
+        for path in tqdm(npz_files, desc=f"Indexing {split_dir.name}", leave=False, dynamic_ncols=True):
             try:
                 with np.load(path) as data:
                     n = int(data["x"].shape[0])
@@ -93,7 +93,7 @@ class PPGDataset(Dataset):
 
     def _do_preload(self) -> None:
         xs, ys = [], []
-        for path in tqdm(self._files, desc="Preloading", unit="file", leave=False):
+        for path in tqdm(self._files, desc="Preloading", unit="file", leave=False, dynamic_ncols=True):
             with np.load(path) as data:
                 xs.append(data["x"].copy())
                 ys.append(data["y"].copy())
