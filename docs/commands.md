@@ -19,6 +19,7 @@ bin/dataset-statistic --dataset-dir data/dataset-v1
 ```bash
 bin/train-model --model acfa
 bin/train-model --model ae_lstm
+bin/train-model --model bpnet_cf
 bin/train-model --model cnn_bilstm_at
 bin/train-model --model conv_reg
 bin/train-model --model conv_reg_at
@@ -46,6 +47,7 @@ bin/train-all-model --dataset-dir data/dataset-v1 --output-dir data/models-v1
 ```bash
 bin/print-model --model acfa              > data/models/acfa/struct.txt
 bin/print-model --model ae_lstm           > data/models/ae_lstm/struct.txt
+bin/print-model --model bpnet_cf           > data/models/bpnet_cf/struct.txt
 bin/print-model --model cnn_bilstm_at     > data/models/cnn_bilstm_at/struct.txt
 bin/print-model --model conv_reg          > data/models/conv_reg/struct.txt
 bin/print-model --model conv_reg_at       > data/models/conv_reg_at/struct.txt
@@ -67,6 +69,7 @@ bin/print-model --model xresnet1d         > data/models/xresnet1d/struct.txt
 
 bin/print-model --model acfa              > data/models-v1/acfa/struct.txt
 bin/print-model --model ae_lstm           > data/models-v1/ae_lstm/struct.txt
+bin/print-model --model bpnet_cf           > data/models-v1/bpnet_cf/struct.txt
 bin/print-model --model cnn_bilstm_at     > data/models-v1/cnn_bilstm_at/struct.txt
 bin/print-model --model conv_reg          > data/models-v1/conv_reg/struct.txt
 bin/print-model --model conv_reg_at       > data/models-v1/conv_reg_at/struct.txt
@@ -88,6 +91,7 @@ bin/print-model --model xresnet1d         > data/models-v1/xresnet1d/struct.txt
 ```bash
 bin/train-status  data/models/acfa
 bin/train-status  data/models/ae_lstm
+bin/train-status  data/models/bpnet_cf
 bin/train-status  data/models/cnn_bilstm_at
 bin/train-status  data/models/conv_reg
 bin/train-status  data/models/conv_reg_at
@@ -109,6 +113,7 @@ bin/train-status  data/models/xresnet1d
 
 bin/train-status  data/models-v1/acfa
 bin/train-status  data/models-v1/ae_lstm
+bin/train-status  data/models-v1/bpnet_cf
 bin/train-status  data/models-v1/cnn_bilstm_at
 bin/train-status  data/models-v1/conv_reg
 bin/train-status  data/models-v1/conv_reg_at
@@ -130,6 +135,7 @@ bin/train-status  data/models-v1/xresnet1d
 ```bash
 bin/eval-model data/models/acfa
 bin/eval-model data/models/ae_lstm
+bin/eval-model data/models/bpnet_cf
 bin/eval-model data/models/cnn_bilstm_at
 bin/eval-model data/models/conv_reg
 bin/eval-model data/models/conv_reg_at

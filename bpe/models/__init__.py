@@ -2,6 +2,7 @@
 
 from bpe.models.acfa import ACFA
 from bpe.models.ae_lstm import AE_LSTM
+from bpe.models.bpnet_cf import BPNetCF
 from bpe.models.cnn_bilstm_at import CNNBiLSTMAttention
 from bpe.models.conv_reg import ConvReg
 from bpe.models.conv_reg_at import ConvRegAt
@@ -33,6 +34,7 @@ from bpe.models.registry import (
 __all__ = [
     "ACFA",
     "AE_LSTM",
+    "BPNetCF",
     "CNNBiLSTMAttention",
     "ConvReg",
     "ConvRegAt",
