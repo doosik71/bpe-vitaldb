@@ -23,6 +23,14 @@ from pathlib import Path
 from queue import Empty, LifoQueue, Queue
 import threading
 
+from bpe.utils.qc_v2 import (
+    QCResult,
+    compute_window_qc,
+    SOURCE_HZ as QC_SOURCE_HZ,
+    TARGET_HZ as QC_TARGET_HZ,
+    SEGMENT_SEC as QC_SEGMENT_SEC,
+)
+
 import matplotlib
 matplotlib.use("TkAgg")  # must be set before importing pyplot
 
@@ -44,8 +52,9 @@ _set_cjk_font()
 # -- Constants -----------------------------------------------------------------
 API_URL = "https://api.vitaldb.net"
 SRATE = 500         # waveform sample rate (Hz)
-WINDOW_SEC = 30     # visible time window (s)
-STEP_SEC = 10       # navigation step (s)
+WINDOW_SEC = 32     # visible time window (s) — 4 × 8 s QC segments
+STEP_SEC = 8        # navigation step (s) — 1 QC segment
+LARGE_STEP_SEC = 64 # Ctrl+arrow step (s) — 8 QC segments
 
 # (track_name, label, color, is_waveform)
 TRACK_DEFS = [
@@ -59,7 +68,7 @@ TRACK_DEFS = [
     ("Solar8000/NIBP_DBP", "NIBP DBP", "#2255bb", False),
     ("Solar8000/NIBP_MBP", "NIBP MBP", "#228844", False),
 ]
-WAVE_TRACKS    = [(n, l, c) for n, l, c, w in TRACK_DEFS if w]
+WAVE_TRACKS = [(n, l, c) for n, l, c, w in TRACK_DEFS if w]
 NUMERIC_TRACKS = [(n, l, c) for n, l, c, w in TRACK_DEFS if not w]
 
 # NIBP tracks use dashed lines to distinguish from invasive ART tracks
@@ -81,13 +90,14 @@ _LABEL_VA = {
 # Row highlight tags: (foreground, background)
 TAG_COLORS = {
     "unknown": ("#777777", "#cccccc"),
-    "none":    ("#000000", "#ffffff"),
-    "ppg":     ("#000000", "#00aa00"),   # dark green text, gray background
-    "abp":     ("#aa0000", "#ffffff"),   # normal text, light red tint
-    "ppg_abp": ("#cc0000", "#00cc00"),   # both
+    "none":    ("#0000dd", "#cccccc"),
+    "ppg":     ("#dd0000", "#cccccc"),
+    "abp":     ("#008800", "#cccccc"),
+    "ppg_abp": ("#000000", "#ffffff"),
 }
 
 # -- Data helpers --------------------------------------------------------------
+
 
 def list_vital_files(data_dir: Path) -> list[Path]:
     return sorted(
@@ -115,6 +125,7 @@ def scan_track_flags(path: Path) -> tuple[bool, bool]:
         return "SNUADC/PLETH" in names, "SNUADC/ART" in names
     except Exception:
         return False, False
+
 
 def load_vital(path: Path) -> tuple[VitalFile, dict[str, np.ndarray]]:
     """Load a .vital file; return (VitalFile, {track_name: ndarray})."""
@@ -175,7 +186,8 @@ class VitalDBBrowser:
         self.track_flags: dict[int, tuple[bool, bool]] = {}
         self._row_by_path: dict[Path, dict] = {}
         self._filtered_rows: list[dict] = []
-        max_cid = max((int(f.stem) for f in files if f.stem.isdigit()), default=0)
+        max_cid = max((int(f.stem)
+                      for f in files if f.stem.isdigit()), default=0)
         self._track_scanned = np.zeros(max_cid + 1, dtype=bool)
         self._track_has_ppg = np.zeros(max_cid + 1, dtype=bool)
         self._track_has_abp = np.zeros(max_cid + 1, dtype=bool)
@@ -194,6 +206,13 @@ class VitalDBBrowser:
         self._bp_match_times: list[int] = []
         self._current_bp_mode = "exact"
         self._canvas_ready = False
+
+        # Dataset-v2 QC overlay state
+        self._has_ppg_abp = False
+        self._ppg_dec: np.ndarray | None = None
+        self._abp_dec: np.ndarray | None = None
+        self._qc_cache: dict[float, QCResult] = {}
+        self._qc_ax: plt.Axes | None = None
 
         # Sorted row cache
         self._sort_col = "case"
@@ -304,11 +323,11 @@ class VitalDBBrowser:
         legend.pack(fill="x", padx=8, pady=(0, 4))
         tk.Label(legend, text="o", bg="#f0f0f7", fg="#228844",
                  font=("Segoe UI", 9)).pack(side="left")
-        tk.Label(legend, text="PPG  ", bg="#f0f0f7", fg="#888899",
+        tk.Label(legend, text="No PPG  ", bg="#f0f0f7", fg="#888899",
                  font=("Segoe UI", 9)).pack(side="left")
         tk.Label(legend, text="#", bg="#fde8e8", fg="#cc2200",
                  font=("Segoe UI", 9)).pack(side="left")
-        tk.Label(legend, text="ABP", bg="#f0f0f7", fg="#888899",
+        tk.Label(legend, text="No ABP", bg="#f0f0f7", fg="#888899",
                  font=("Segoe UI", 9)).pack(side="left")
 
         # Treeview
@@ -337,7 +356,8 @@ class VitalDBBrowser:
             self._tree.column(cid, width=width, anchor=anchor,
                               stretch=(cid == "opname"))
 
-        vsb = ttk.Scrollbar(frame, orient="vertical", command=self._on_tree_scroll)
+        vsb = ttk.Scrollbar(frame, orient="vertical",
+                            command=self._on_tree_scroll)
         self._tree.configure(yscrollcommand=vsb.set)
         self._tree.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
@@ -476,7 +496,7 @@ class VitalDBBrowser:
         bar = tk.Frame(parent, bg="#f0f0f7")
         bar.pack(fill="x", padx=6, pady=(2, 4))
 
-        tk.Button(bar, text="<< 60s", command=lambda: self._shift(-60),
+        tk.Button(bar, text=f"<< {LARGE_STEP_SEC}s", command=lambda: self._shift(-LARGE_STEP_SEC),
                   **kw).pack(side="left", padx=2)
         tk.Button(bar, text=f"< {STEP_SEC}s", command=lambda: self._shift(
             -STEP_SEC), **kw).pack(side="left", padx=2)
@@ -493,7 +513,7 @@ class VitalDBBrowser:
 
         tk.Button(bar, text=f"{STEP_SEC}s >", command=lambda: self._shift(
             +STEP_SEC), **kw).pack(side="left", padx=2)
-        tk.Button(bar, text="60s >>", command=lambda: self._shift(+60),
+        tk.Button(bar, text=f"{LARGE_STEP_SEC}s >>", command=lambda: self._shift(+LARGE_STEP_SEC),
                   **kw).pack(side="left", padx=2)
 
         kw2 = dict(kw, bg="#d0dde8", activebackground="#3366cc")
@@ -508,8 +528,8 @@ class VitalDBBrowser:
         # Keyboard bindings on root
         self.root.bind("<Left>", lambda e: self._shift(-STEP_SEC))
         self.root.bind("<Right>", lambda e: self._shift(+STEP_SEC))
-        self.root.bind("<Control-Left>", lambda e: self._shift(-60))
-        self.root.bind("<Control-Right>", lambda e: self._shift(+60))
+        self.root.bind("<Control-Left>", lambda e: self._shift(-LARGE_STEP_SEC))
+        self.root.bind("<Control-Right>", lambda e: self._shift(+LARGE_STEP_SEC))
 
     # -- List management -------------------------------------------------------
 
@@ -591,7 +611,8 @@ class VitalDBBrowser:
             return []
 
         first = self._tree.identify_row(0) or children[0]
-        last = self._tree.identify_row(max(self._tree.winfo_height() - 1, 0)) or children[-1]
+        last = self._tree.identify_row(
+            max(self._tree.winfo_height() - 1, 0)) or children[-1]
 
         try:
             i0 = children.index(first)
@@ -707,6 +728,18 @@ class VitalDBBrowser:
         self._t0 = 0.0
         self._current_path = path
 
+        # Pre-decimate once so per-view QC queries are fast
+        ppg_raw = data.get("SNUADC/PLETH")
+        abp_raw = data.get("SNUADC/ART")
+        factor = QC_SOURCE_HZ // QC_TARGET_HZ
+        if ppg_raw is not None and abp_raw is not None:
+            self._ppg_dec = ppg_raw[::factor].astype(np.float32)
+            self._abp_dec = abp_raw[::factor].astype(np.float32)
+        else:
+            self._ppg_dec = None
+            self._abp_dec = None
+        self._qc_cache = {}
+
         self._show_canvas()
         self._rebuild_figure()
         self._run_bp_search()
@@ -715,7 +748,7 @@ class VitalDBBrowser:
         self._set_status(
             f"Case {path.stem}  |  tracks: {', '.join(avail)}"
             f"  |  duration: {dur_m}m {dur_s}s"
-            f"  |  Keys: <--> {STEP_SEC}s   Ctrl+<--> 60s"
+            f"  |  Keys: <--> {STEP_SEC}s   Ctrl+<--> {LARGE_STEP_SEC}s"
         )
 
     # -- Figure construction ---------------------------------------------------
@@ -725,6 +758,7 @@ class VitalDBBrowser:
         self._fig.clear()
         self._wave_axes = []
         self._num_ax = None
+        self._qc_ax = None
         self._time_text = None
 
         avail_waves = [(n, l, c) for n, l, c in WAVE_TRACKS if n in self._data]
@@ -733,26 +767,43 @@ class VitalDBBrowser:
         self._avail_waves = avail_waves
         self._avail_numeric = avail_numeric
 
+        self._has_ppg_abp = (
+            "SNUADC/PLETH" in self._data and "SNUADC/ART" in self._data
+        )
+
         n_wave = len(avail_waves)
         n_num = len(avail_numeric)
-        n_rows = n_wave + (1 if n_num else 0)
+        add_qc = self._has_ppg_abp
+        n_rows = n_wave + (1 if n_num else 0) + (1 if add_qc else 0)
 
         if n_rows == 0:
             return
 
+        height_ratios = (
+            [2] * n_wave
+            + ([1.4] if n_num else [])
+            + ([0.55] if add_qc else [])
+        )
         gs = gridspec.GridSpec(
             n_rows, 1, figure=self._fig,
             hspace=0.06, top=0.94, bottom=0.06,
-            height_ratios=[2] * n_wave + ([1.4] if n_num else []),
+            height_ratios=height_ratios,
         )
 
         for i in range(n_wave):
             ax = self._fig.add_subplot(gs[i, 0])
             self._wave_axes.append(ax)
-        if n_num:
-            self._num_ax = self._fig.add_subplot(gs[n_wave, 0])
 
-        # Share x-axis
+        next_row = n_wave
+        if n_num:
+            self._num_ax = self._fig.add_subplot(gs[next_row, 0])
+            next_row += 1
+        if add_qc:
+            self._qc_ax = self._fig.add_subplot(gs[next_row, 0])
+            if self._wave_axes:
+                self._qc_ax.sharex(self._wave_axes[0])
+
+        # Share x-axis among wave axes
         for ax in self._wave_axes[1:]:
             ax.sharex(self._wave_axes[0])
 
@@ -822,11 +873,20 @@ class VitalDBBrowser:
             ax.spines["right"].set_visible(False)
 
         # Hide x-tick labels on all waveform panels except the last
+        # (or all of them when the QC strip is present, which carries the x-axis)
+        hide_wave_xlabel = self._qc_ax is not None
         for ax in self._wave_axes[:-1]:
             plt.setp(ax.get_xticklabels(), visible=False)
         if self._wave_axes:
-            self._wave_axes[-1].set_xlabel("Time (s)",
-                                           color="#888899", fontsize=8)
+            if hide_wave_xlabel:
+                plt.setp(self._wave_axes[-1].get_xticklabels(), visible=False)
+                self._wave_axes[-1].set_xlabel("")
+            else:
+                self._wave_axes[-1].set_xlabel("Time (s)",
+                                               color="#888899", fontsize=8)
+
+        # Dataset-v2 QC segment overlays on wave axes
+        self._draw_qc_overlay()
 
         if self._num_ax:
             ax = self._num_ax
@@ -853,7 +913,8 @@ class VitalDBBrowser:
             ax.set_ylim(y_lo - pad, y_hi + pad)
 
             ax.set_xlim(self._t0, t_end)
-            ax.set_ylabel("SBP / DBP / MBP (mmHg)", color="#222233", fontsize=8)
+            ax.set_ylabel("SBP / DBP / MBP (mmHg)",
+                          color="#222233", fontsize=8)
             ax.set_xlabel("Time (s)", color="#888899", fontsize=8)
             ax.legend(loc="upper right", fontsize=7, framealpha=0.3,
                       labelcolor="#222233", facecolor="#ffffff")
@@ -861,6 +922,9 @@ class VitalDBBrowser:
             ax.spines[:].set_color("#ccccdd")
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
+
+        if self._qc_ax is not None:
+            self._draw_qc_strip()
 
         # Time stamp in nav bar
         def _fmt(s):
@@ -915,7 +979,8 @@ class VitalDBBrowser:
             return
 
         if "Solar8000/ART_SBP" not in self._data or "Solar8000/ART_DBP" not in self._data:
-            self._bp_status.set("This case does not contain numeric SBP/DBP tracks.")
+            self._bp_status.set(
+                "This case does not contain numeric SBP/DBP tracks.")
             return
 
         sbp_arr = self._data["Solar8000/ART_SBP"]
@@ -931,7 +996,8 @@ class VitalDBBrowser:
         if self._current_bp_mode == "exact":
             match_mask = (sbp_arr == sbp) & (dbp_arr == dbp)
         else:
-            match_mask = (np.round(sbp_arr) == sbp) & (np.round(dbp_arr) == dbp)
+            match_mask = (np.round(sbp_arr) == sbp) & (
+                np.round(dbp_arr) == dbp)
         match_mask &= ~np.isnan(sbp_arr) & ~np.isnan(dbp_arr)
 
         matches = np.flatnonzero(match_mask)
@@ -1037,6 +1103,100 @@ class VitalDBBrowser:
                   activeforeground="white", relief="flat",
                   font=("Segoe UI", 9), padx=12, pady=3, cursor="hand2"
                   ).pack(side="right")
+
+    # -- Dataset-v2 QC --------------------------------------------------------
+
+    def _qc_window_results(self) -> list[QCResult]:
+        """Return QC results for segments overlapping the current view, using cache."""
+        if not self._has_ppg_abp or self._ppg_dec is None or self._abp_dec is None:
+            return []
+        return compute_window_qc(
+            self._ppg_dec,
+            self._abp_dec,
+            t0=self._t0,
+            t1=self._t0 + WINDOW_SEC,
+            cache=self._qc_cache,
+        )
+
+    def _draw_qc_overlay(self):
+        """Overlay per-segment QC spans on every wave axis."""
+        if not self._wave_axes:
+            return
+        t_end = self._t0 + WINDOW_SEC
+        for qr in self._qc_window_results():
+            ts = qr.t_start
+            te = ts + QC_SEGMENT_SEC
+            color = "#22bb66" if qr.passed else "#ee3311"
+            alpha = 0.07 if qr.passed else 0.15
+            for ax in self._wave_axes:
+                ax.axvspan(ts, te, alpha=alpha, color=color,
+                           linewidth=0, zorder=0)
+            if not qr.passed:
+                lx = max(ts, self._t0)
+                self._wave_axes[0].text(
+                    lx, 0.97, f"R{qr.failed_rule}",
+                    transform=self._wave_axes[0].get_xaxis_transform(),
+                    ha="left", va="top",
+                    color="#cc1100", fontsize=7, fontweight="bold",
+                    bbox=dict(boxstyle="round,pad=0.15",
+                              facecolor="white", edgecolor="#cc1100", alpha=0.75),
+                    clip_on=True, zorder=5,
+                )
+
+    def _draw_qc_strip(self):
+        """Draw the compact v2-QC strip at the bottom of the figure."""
+        ax = self._qc_ax
+        if ax is None:
+            return
+        ax.cla()
+        ax.set_facecolor("#f0f0f6")
+
+        t_end = self._t0 + WINDOW_SEC
+        ax.set_xlim(self._t0, t_end)
+        ax.set_ylim(0, 1)
+        ax.set_yticks([])
+        ax.set_ylabel("v2 QC", color="#888899", fontsize=7,
+                      rotation=0, labelpad=30, va="center")
+        ax.set_xlabel("Time (s)", color="#888899", fontsize=8)
+        ax.tick_params(colors="#888899", labelsize=7)
+        ax.spines[:].set_color("#ccccdd")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        n_pass = n_fail = 0
+        for qr in self._qc_window_results():
+            ts = qr.t_start
+            te = ts + QC_SEGMENT_SEC
+            color = "#22bb66" if qr.passed else "#ee3311"
+            ax.axvspan(ts, te, alpha=0.80, color=color,
+                       linewidth=0.5, edgecolor="white")
+            if qr.passed:
+                lx = (max(ts, self._t0) + min(te, t_end)) / 2
+                ha = "center"
+            else:
+                lx = max(ts, self._t0)
+                ha = "left"
+            lbl = "✓" if qr.passed else f"R{qr.failed_rule}"
+            ax.text(lx, 0.5, lbl,
+                    transform=ax.get_xaxis_transform(),
+                    ha=ha, va="center",
+                    color="white", fontsize=7, fontweight="bold",
+                    clip_on=True)
+            if qr.passed:
+                n_pass += 1
+            else:
+                n_fail += 1
+
+        # Right-side summary
+        total = n_pass + n_fail
+        if total:
+            summary = f"  {n_pass}/{total} pass"
+            ax.text(0.995, 0.5, summary,
+                    transform=ax.transAxes,
+                    ha="right", va="center",
+                    color="#444455", fontsize=7,
+                    bbox=dict(boxstyle="round,pad=0.2",
+                              facecolor="#f0f0f6", edgecolor="none", alpha=0.85))
 
     # -- Helpers ---------------------------------------------------------------
 
