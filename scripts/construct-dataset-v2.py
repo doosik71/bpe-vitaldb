@@ -28,10 +28,12 @@ Each .npz contains:
 
 import argparse
 import csv
+import json
 import logging
 import multiprocessing as mp
 import os
 import random
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -365,18 +367,20 @@ def _segment_label_and_quality(
     abp_raw_seg: np.ndarray,
     fs: int,
     args: argparse.Namespace,
-) -> tuple[np.ndarray, list[float]] | None:
+) -> tuple[np.ndarray, list[float]] | int:
     """
     ppg_seg     — BPF 적용 PPG 세그먼트 (peak 검출 및 FASQA에 사용)
     abp_seg     — BPF 적용 ABP 세그먼트 (peak 검출 및 FASQA에 사용)
     abp_raw_seg — BPF 미적용 decimated ABP 원본 (레이블·혈압 범위·변동성 검사에 사용)
+
+    Returns (ppg_seg, [avg_sbp, avg_dbp]) on success, or int failed_rule (1-9) on failure.
     """
     if not np.all(np.isfinite(ppg_seg)) or not np.all(np.isfinite(abp_seg)):
-        return None
+        return 1
 
     fixed = _rule1_repetition_and_interpolation(abp_seg, ppg_seg, args.contlen)
     if fixed is None:
-        return None
+        return 1
     abp_seg, ppg_seg = fixed
 
     abp_peaks, abp_foots = _find_abp_peak_foots(abp_seg, fs)
@@ -393,7 +397,7 @@ def _segment_label_and_quality(
         psd_high_max=args.fasqa_psd_high_max,
     )
     if not abp_ok:
-        return None
+        return 2
 
     # Rule 2: FASQA — PPG (Min-Max 정규화 후)
     ppg_ok, _ = _fasqa_adaptive(
@@ -406,54 +410,53 @@ def _segment_label_and_quality(
         psd_high_max=args.fasqa_psd_high_max,
     )
     if not ppg_ok:
-        return None
+        return 2
 
     # 레이블 사전 산출: BPF 미적용 원신호에서 절대 mmHg 값 추출 (Rule 3, 8에서 필요)
     if abp_peaks.size == 0 or abp_foots.size == 0:
-        return None
+        return 3
     avg_sbp = float(np.mean(abp_raw_seg[abp_peaks]))
     avg_dbp = float(np.mean(abp_raw_seg[abp_foots]))
 
     # Rule 3: 혈압 범위 검사
     if not (args.sbp_min <= avg_sbp <= args.sbp_max and args.dbp_min <= avg_dbp <= args.dbp_max):
-        return None
+        return 3
+    # 기본: SBP > DBP 생리적 일관성 검사 — Rule 3으로 분류
+    if avg_sbp <= avg_dbp:
+        return 3
 
     # Rule 4: 심박수 범위 검사
     hr_abp = _avg_heart_rate(abp_peaks, abp_foots, fs)
     hr_ppg = _avg_heart_rate(ppg_peaks, ppg_foots, fs)
     if hr_abp is None or hr_ppg is None:
-        return None
+        return 4
     if not (args.hr_min <= hr_abp <= args.hr_max and args.hr_min <= hr_ppg <= args.hr_max):
-        return None
+        return 4
 
     # Rule 5: ABP–PPG 심박수 일치 검사
     if abs(hr_abp - hr_ppg) > args.hr_diff_max:
-        return None
+        return 5
 
     # Rule 6: Peak/Foot 개수 차이 검사
     if (
         abs(len(abp_peaks) - len(abp_foots)) > args.peak_foot_diff_max
         or abs(len(ppg_peaks) - len(ppg_foots)) > args.peak_foot_diff_max
     ):
-        return None
+        return 6
 
     # Rule 7: 최소 Peak/Foot 개수 검사
     if len(abp_peaks) < args.min_peaks or len(abp_foots) < args.min_peaks:
-        return None
+        return 7
 
     # Rule 8: 세그먼트 내 혈압 변동 범위 검사 (원신호 기준)
     if np.ptp(abp_raw_seg[abp_peaks]) > args.sbp_range_max:
-        return None
+        return 8
     if np.ptp(abp_raw_seg[abp_foots]) > args.dbp_range_max:
-        return None
+        return 8
 
     # Rule 9: PPG Skewness 검사
     if _average_cycle_skewness(ppg_foots, ppg_seg) <= 0.0:
-        return None
-
-    # 기본: SBP > DBP 생리적 일관성 검사
-    if avg_sbp <= avg_dbp:
-        return None
+        return 9
 
     return ppg_seg.astype(np.float32), [avg_sbp, avg_dbp]
 
@@ -463,7 +466,13 @@ def process_case(
     *,
     args: argparse.Namespace,
     guard_sec: int,
-) -> tuple[np.ndarray, np.ndarray] | None:
+) -> tuple[np.ndarray | None, np.ndarray | None, int, dict[int, int]]:
+    """
+    Returns (x, y, n_windows_evaluated, rule_rejects).
+    x / y are None when no segments passed QC.
+    n_windows_evaluated counts windows that entered quality evaluation
+    (guard-band-edge windows are excluded but non-finite windows are counted under rule 1).
+    """
     if SOURCE_HZ % args.target_hz != 0:
         raise ValueError(
             f"SOURCE_HZ ({SOURCE_HZ}) must be divisible by --target-hz ({args.target_hz})"
@@ -480,30 +489,32 @@ def process_case(
         available = set(vf.get_track_names())
     except Exception as exc:
         log.warning("%s: cannot open - %s", path.stem, exc)
-        return None
+        return None, None, 0, {}
 
     required = {"SNUADC/PLETH", "SNUADC/ART"}
     if not required.issubset(available):
-        return None
+        return None, None, 0, {}
 
     try:
         ppg_raw = vf.to_numpy(["SNUADC/PLETH"], interval=1 / SOURCE_HZ)[:, 0]
         abp_raw = vf.to_numpy(["SNUADC/ART"], interval=1 / SOURCE_HZ)[:, 0]
     except Exception as exc:
         log.warning("%s: track read error - %s", path.stem, exc)
-        return None
+        return None, None, 0, {}
 
     ppg = ppg_raw[::factor]
     abp = abp_raw[::factor]
     total_samples = min(len(ppg), len(abp))
     if total_samples < segment_samples:
-        return None
+        return None, None, 0, {}
     ppg = ppg[:total_samples]
     abp = abp[:total_samples]
 
     n_windows = int((total_samples - segment_samples) / stride_samples) + 1
     xs: list[np.ndarray] = []
     ys: list[list[float]] = []
+    n_windows_evaluated = 0
+    rule_rejects: dict[int, int] = {}
 
     for w in range(n_windows):
         ps = w * stride_samples
@@ -516,22 +527,27 @@ def process_case(
         if filter_start < 0 or filter_end > total_samples:
             continue
 
+        n_windows_evaluated += 1
+
         ppg_region = ppg[filter_start:filter_end]
         abp_region = abp[filter_start:filter_end]
         if not np.all(np.isfinite(ppg_region)) or not np.all(np.isfinite(abp_region)):
+            rule_rejects[1] = rule_rejects.get(1, 0) + 1
             continue
 
         try:
             ppg_filtered = _bandpass_filter(ppg_region, args.target_hz)
             abp_filtered = _bandpass_filter(abp_region, args.target_hz)
         except Exception:
+            rule_rejects[1] = rule_rejects.get(1, 0) + 1
             continue
 
         ppg_seg     = ppg_filtered[guard_samples : guard_samples + segment_samples]
         abp_seg     = abp_filtered[guard_samples : guard_samples + segment_samples]
         abp_raw_seg = abp[ps:pe]  # BPF 미적용 decimated 원신호 — 레이블 mmHg 값 산출용
         result = _segment_label_and_quality(ppg_seg, abp_seg, abp_raw_seg, args.target_hz, args)
-        if result is None:
+        if isinstance(result, int):
+            rule_rejects[result] = rule_rejects.get(result, 0) + 1
             continue
 
         x_seg, label = result
@@ -539,12 +555,19 @@ def process_case(
         ys.append(label)
 
     if not xs:
-        return None
+        return None, None, n_windows_evaluated, rule_rejects
 
-    return np.asarray(xs, dtype=np.float32), np.asarray(ys, dtype=np.float32)
+    return (
+        np.asarray(xs, dtype=np.float32),
+        np.asarray(ys, dtype=np.float32),
+        n_windows_evaluated,
+        rule_rejects,
+    )
 
 
-def _process_chunk(args_tuple: tuple) -> tuple[dict[str, int], dict[str, int]]:
+def _process_chunk(
+    args_tuple: tuple,
+) -> tuple[dict[str, int], dict[str, int], dict[str, int], dict[str, dict[int, int]]]:
     worker_id, tasks, args, guard_sec, csv_paths, csv_lock = args_tuple
 
     pbar = tqdm(
@@ -559,16 +582,23 @@ def _process_chunk(args_tuple: tuple) -> tuple[dict[str, int], dict[str, int]]:
 
     seg_counts: dict[str, int] = {}
     skip_counts: dict[str, int] = {}
+    window_counts: dict[str, int] = {}
+    rule_rejects: dict[str, dict[int, int]] = {}
 
     for path, out_dir, split_name in tasks:
-        result = process_case(path, args=args, guard_sec=guard_sec)
+        x, y, n_windows_eval, case_rejects = process_case(path, args=args, guard_sec=guard_sec)
         out_path = out_dir / f"{path.stem}.npz"
-        if result is None:
+
+        window_counts[split_name] = window_counts.get(split_name, 0) + n_windows_eval
+        split_rejects = rule_rejects.setdefault(split_name, {})
+        for rule, count in case_rejects.items():
+            split_rejects[rule] = split_rejects.get(rule, 0) + count
+
+        if x is None:
             skip_counts[split_name] = skip_counts.get(split_name, 0) + 1
             out_path.unlink(missing_ok=True)
             n_segs = 0
         else:
-            x, y = result
             tmp_path = out_dir / f".{path.stem}.tmp.npz"
             np.savez_compressed(tmp_path, x=x, y=y)
             tmp_path.rename(out_path)
@@ -579,7 +609,7 @@ def _process_chunk(args_tuple: tuple) -> tuple[dict[str, int], dict[str, int]]:
         pbar.update(1)
 
     pbar.close()
-    return seg_counts, skip_counts
+    return seg_counts, skip_counts, window_counts, rule_rejects
 
 
 def main() -> None:
@@ -729,6 +759,8 @@ def main() -> None:
 
     seg_counts: dict[str, int] = {name: 0 for name in splits}
     skip_counts: dict[str, int] = {name: 0 for name in splits}
+    window_counts: dict[str, int] = {name: 0 for name in splits}
+    rule_rejects: dict[str, dict[int, int]] = {name: {} for name in splits}
 
     if pending:
         n_workers = min(nproc, len(pending))
@@ -750,11 +782,16 @@ def main() -> None:
 
         print()
 
-        for worker_seg, worker_skip in results:
+        for worker_seg, worker_skip, worker_windows, worker_rejects in results:
             for split, count in worker_seg.items():
                 seg_counts[split] += count
             for split, count in worker_skip.items():
                 skip_counts[split] += count
+            for split, count in worker_windows.items():
+                window_counts[split] += count
+            for split, rejects in worker_rejects.items():
+                for rule, count in rejects.items():
+                    rule_rejects[split][rule] = rule_rejects[split].get(rule, 0) + count
 
     for split_name, files in splits.items():
         log.info(
@@ -785,6 +822,99 @@ def main() -> None:
     log.info("  " + "-" * 42)
     log.info("  %-5s   %12s   %12s   %5.1f%%", "total", f"{total_new:,}", f"{total_all:,}", 100.0)
     log.info("Output written to %s", args.output_dir.resolve())
+
+    # ------------------------------------------------------------------
+    # Write construction-results.json
+    # ------------------------------------------------------------------
+    total_windows_all = sum(window_counts.values())
+    total_segs_new = sum(seg_counts.values())
+    total_segs_resumed = sum(resumed_seg_counts.values())
+    total_segs_all = total_segs_new + total_segs_resumed
+    total_cases_resumed = sum(resume_counts.values())
+
+    json_splits: dict[str, dict] = {}
+    total_rule_rejects: dict[str, int] = {}
+
+    for split_name in splits:
+        n_cases_assigned = len(splits[split_name])
+        n_cases_resumed = resume_counts[split_name]
+        n_cases_no_output = skip_counts[split_name]
+        n_win = window_counts[split_name]
+        n_segs_new = seg_counts[split_name]
+        n_segs_total = n_segs_new + resumed_seg_counts[split_name]
+        rejects_by_rule = {
+            f"rule_{r}": rule_rejects[split_name].get(r, 0) for r in range(1, 10)
+        }
+        yield_pct = round(n_segs_new / n_win * 100, 2) if n_win > 0 else 0.0
+
+        json_splits[split_name] = {
+            "n_cases": n_cases_assigned,
+            "n_cases_resumed": n_cases_resumed,
+            "n_cases_processed": n_cases_assigned - n_cases_resumed,
+            "n_cases_no_output": n_cases_no_output,
+            "n_windows_evaluated": n_win,
+            "n_segments_generated": n_segs_new,
+            "n_segments_total": n_segs_total,
+            "yield_pct": yield_pct,
+            "rejections_by_rule": rejects_by_rule,
+        }
+
+        for key, count in rejects_by_rule.items():
+            total_rule_rejects[key] = total_rule_rejects.get(key, 0) + count
+
+    total_yield_pct = (
+        round(total_segs_new / total_windows_all * 100, 2)
+        if total_windows_all > 0 else 0.0
+    )
+
+    results_doc: dict = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "args": {
+            "target_hz": args.target_hz,
+            "segment_sec": args.segment_sec,
+            "guard_sec": guard_sec,
+            "split": args.split,
+            "seed": args.seed,
+            "contlen": args.contlen,
+            "sbp_min": args.sbp_min,
+            "sbp_max": args.sbp_max,
+            "dbp_min": args.dbp_min,
+            "dbp_max": args.dbp_max,
+            "hr_min": args.hr_min,
+            "hr_max": args.hr_max,
+            "hr_diff_max": args.hr_diff_max,
+            "peak_foot_diff_max": args.peak_foot_diff_max,
+            "min_peaks": args.min_peaks,
+            "sbp_range_max": args.sbp_range_max,
+            "dbp_range_max": args.dbp_range_max,
+            "fasqa_psd_low_max": args.fasqa_psd_low_max,
+            "fasqa_psd_tgt_min": args.fasqa_psd_tgt_min,
+            "fasqa_psd_high_max": args.fasqa_psd_high_max,
+        },
+        "total": {
+            "n_cases": len(vital_files),
+            "n_cases_resumed": total_cases_resumed,
+            "n_cases_processed": len(vital_files) - total_cases_resumed,
+            "n_cases_no_output": sum(skip_counts.values()),
+            "n_windows_evaluated": total_windows_all,
+            "n_segments_generated": total_segs_new,
+            "n_segments_total": total_segs_all,
+            "yield_pct": total_yield_pct,
+            "rejections_by_rule": total_rule_rejects,
+        },
+        "splits": json_splits,
+    }
+
+    if total_cases_resumed > 0:
+        results_doc["note"] = (
+            "rejections_by_rule and n_windows_evaluated cover only newly processed cases; "
+            f"{total_cases_resumed} resumed case(s) are not included in those counts."
+        )
+
+    json_path = args.output_dir / "construction-results.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(results_doc, f, indent=2, ensure_ascii=False)
+    log.info("Construction results written to %s", json_path)
 
 
 if __name__ == "__main__":

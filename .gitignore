@@ -19,3 +19,4 @@ wheels/
 /logs/
 /models/
 .ipynb_checkpoints/
+.claude/
