@@ -4,19 +4,19 @@ Collect result files from all model directories.
 Scans data/models/<model>/ and copies files from each model directory.
 
 Files collected:
-  loss_graph.png             -> images/loss_graph/<model>.png
-  mae_graph.png              -> images/mae_graph/<model>.png
-  error_hist.png             -> images/error_hist/<model>.png
-  eval_plot.png              -> images/eval_plot/<model>.png
-  bland_altman.png           -> images/bland_altman/<model>.png
-  bland_altman_all.png       -> images/bland_altman_all/<model>.png
-  bland_altman_accepted.png  -> images/bland_altman_accepted/<model>.png
-  eval_results.json          -> logs/eval_results/<model>.json
-  metrics.csv                -> logs/metrics/<model>.csv
+  loss_graph.png             -> results/loss_graph/<model>.png
+  mae_graph.png              -> results/mae_graph/<model>.png
+  error_hist.png             -> results/error_hist/<model>.png
+  eval_plot.png              -> results/eval_plot/<model>.png
+  bland_altman.png           -> results/bland_altman/<model>.png
+  bland_altman_all.png       -> results/bland_altman_all/<model>.png
+  bland_altman_accepted.png  -> results/bland_altman_accepted/<model>.png
+  eval_results.json          -> results/eval_results/<model>.json
+  metrics.csv                -> results/metrics/<model>.csv
 
 Usage:
     uv run python scripts/collect-result.py
-    uv run python scripts/collect-result.py --models-dir data/models --images-dir data/images --logs-dir data/logs
+    uv run python scripts/collect-result.py --models-dir data/models --results-dir data/results
 """
 
 import argparse
@@ -45,17 +45,13 @@ def parse_args() -> argparse.Namespace:
         help="Root directory containing model run subdirectories (default: data/models)",
     )
     p.add_argument(
-        "--images-dir", type=Path, default=Path("data/images"),
-        help="Output directory for PNG images (default: data/images)",
-    )
-    p.add_argument(
-        "--logs-dir", type=Path, default=Path("data/logs"),
-        help="Output directory for eval_results.json and metrics.csv (default: data/logs)",
+        "--results-dir", type=Path, default=Path("data/results"),
+        help="Output directory for all collected files (default: data/results)",
     )
     return p.parse_args()
 
 
-def collect(models_dir: Path, images_dir: Path, logs_dir: Path) -> None:
+def collect(models_dir: Path, results_dir: Path) -> None:
     if not models_dir.exists():
         print(f"Models directory not found: {models_dir}")
         return
@@ -74,7 +70,7 @@ def collect(models_dir: Path, images_dir: Path, logs_dir: Path) -> None:
             if not src.exists():
                 continue
             graph_type = graph_name.removesuffix(".png")
-            dest_dir = images_dir / graph_type
+            dest_dir = results_dir / graph_type
             dest_dir.mkdir(parents=True, exist_ok=True)
             dest = dest_dir / f"{model_name}.png"
             shutil.copy2(src, dest)
@@ -82,8 +78,8 @@ def collect(models_dir: Path, images_dir: Path, logs_dir: Path) -> None:
             copied += 1
 
         for src_name, dest_subdir, dest_ext in [
-            ("eval_results.json", logs_dir / "eval_results", ".json"),
-            ("metrics.csv",       logs_dir / "metrics",      ".csv"),
+            ("eval_results.json", results_dir / "eval_results", ".json"),
+            ("metrics.csv",       results_dir / "metrics",      ".csv"),
         ]:
             src = model_dir / src_name
             if not src.exists():
@@ -99,7 +95,7 @@ def collect(models_dir: Path, images_dir: Path, logs_dir: Path) -> None:
 
 def main() -> None:
     args = parse_args()
-    collect(args.models_dir, args.images_dir, args.logs_dir)
+    collect(args.models_dir, args.results_dir)
 
 
 if __name__ == "__main__":

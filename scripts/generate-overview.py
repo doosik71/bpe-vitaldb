@@ -14,20 +14,20 @@ Data sources:
   data/models/<model>/eval_results.json    - metric values + inference time
 
 Output:
-  images/plot_mae.png / images/plot_mae.html
-  images/plot_me.png / images/plot_me.html
-  images/plot_sd.png / images/plot_sd.html
-  images/plot_rmse.png / images/plot_rmse.html
-  images/plot_inference_time.png / images/plot_inference_time.html
-  images/bar_mae.png
-  images/bar_me.png
-  images/bar_sd.png
-  images/bar_rmse.png
-  images/bar_inference_time.png
+  results/plot_mae.png / results/plot_mae.html
+  results/plot_me.png / results/plot_me.html
+  results/plot_sd.png / results/plot_sd.html
+  results/plot_rmse.png / results/plot_rmse.html
+  results/plot_inference_time.png / results/plot_inference_time.html
+  results/bar_mae.png
+  results/bar_me.png
+  results/bar_sd.png
+  results/bar_rmse.png
+  results/bar_inference_time.png
 
 Usage:
     uv run python scripts/generate-overview.py
-    uv run python scripts/generate-overview.py --models-dir data/models --output-dir images
+    uv run python scripts/generate-overview.py --models-dir data/models --results-dir data/results
     uv run python scripts/generate-overview.py --format html
 """
 
@@ -68,8 +68,8 @@ def parse_args() -> argparse.Namespace:
         help="Root directory containing model subdirectories (default: data/models)",
     )
     p.add_argument(
-        "--output-dir", type=Path, default=Path("data/images"),
-        help="Directory to write graph files (default: data/images)",
+        "--results-dir", type=Path, default=Path("data/results"),
+        help="Directory to write graph files (default: data/results)",
     )
     p.add_argument(
         "--format", choices=["png", "html", "both"], default="both",
@@ -641,23 +641,23 @@ def main() -> None:
         return
 
     print(f"Loaded {len(data)} models.")
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    args.results_dir.mkdir(parents=True, exist_ok=True)
 
     want_png = args.format in {"png", "both"}
     want_html = args.format in {"html", "both"}
 
     for metric, ylabel, zero_line in METRICS:
         if want_png:
-            plot_metric_png(data, metric, ylabel, zero_line, args.output_dir)
-            plot_metric_bar_png(data, metric, ylabel, zero_line, args.output_dir)
+            plot_metric_png(data, metric, ylabel, zero_line, args.results_dir)
+            plot_metric_bar_png(data, metric, ylabel, zero_line, args.results_dir)
         if want_html:
-            plot_metric_html(data, metric, ylabel, zero_line, args.output_dir)
+            plot_metric_html(data, metric, ylabel, zero_line, args.results_dir)
 
     if want_png:
-        plot_inference_time_png(data, args.output_dir)
-        plot_inference_time_bar_png(data, args.output_dir)
+        plot_inference_time_png(data, args.results_dir)
+        plot_inference_time_bar_png(data, args.results_dir)
     if want_html:
-        plot_inference_time_html(data, args.output_dir)
+        plot_inference_time_html(data, args.results_dir)
 
     print("Done.")
 

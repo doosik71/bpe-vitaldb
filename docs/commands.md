@@ -210,10 +210,10 @@ bin/eval-all-model --dataset-dir data/dataset-v2 --models-dir data/models-v2
 ```bash
 bin/collect-result
 
-bin/collect-result --models-dir data/models-v1 --images-dir data/images-v1 --logs-dir data/logs-v1
-bin/collect-result --models-dir data/models-v2 --images-dir data/images-v2 --logs-dir data/logs-v2
+bin/collect-result --models-dir data/models-v1 --results-dir data/results-v1
+bin/collect-result --models-dir data/models-v2 --results-dir data/results-v2
 
 bin/generate-overview
-bin/generate-overview --models-dir data/models-v1 --output-dir data/images-v1
-bin/generate-overview --models-dir data/models-v2 --output-dir data/images-v2
+bin/generate-overview --models-dir data/models-v1 --results-dir data/results-v1
+bin/generate-overview --models-dir data/models-v2 --results-dir data/results-v2
 ```

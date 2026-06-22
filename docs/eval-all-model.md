@@ -346,12 +346,11 @@ bin/eval-all-model \
 ```bash
 bin/collect-result \
   --models-dir data/models-v1 \
-  --images-dir data/images-v1 \
-  --logs-dir data/logs-v1
+  --results-dir data/results-v1
 
 bin/generate-overview \
   --models-dir data/models-v1 \
-  --output-dir data/images-v1
+  --results-dir data/results-v1
 ```
 
 ## 9. 한계와 향후 확장
