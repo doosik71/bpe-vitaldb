@@ -1,5 +1,11 @@
 # 배치/쉘 명령어 사용 예시
 
+## VitalDB 다운로드
+
+```bash
+bin/download-vitaldb --help
+```
+
 ## 데이터셋 구축
 
 ```bash
@@ -38,8 +44,9 @@ bin/train-model --model resnet1d_tiny
 bin/train-model --model st_resnet
 bin/train-model --model xresnet1d
 
-bin/train-all-model --dataset-dir data/dataset-v1 --output-dir data/models-v1
-bin/train-all-model --dataset-dir data/dataset-v2 --output-dir data/models-v2
+bin/train-all-model
+bin/train-all-model --dataset-dir data/dataset-v1 --models-dir data/models-v1
+bin/train-all-model --dataset-dir data/dataset-v2 --models-dir data/models-v2
 ```
 
 ## 모델 구조 출력
@@ -101,67 +108,75 @@ bin/print-model --model resnet1d_mini     > data/models-v2/resnet1d_mini/struct.
 bin/print-model --model resnet1d_tiny     > data/models-v2/resnet1d_tiny/struct.txt
 bin/print-model --model st_resnet         > data/models-v2/st_resnet/struct.txt
 bin/print-model --model xresnet1d         > data/models-v2/xresnet1d/struct.txt
+
+bin/print-all-model
+bin/print-all-model --models-dir data/models-v1
+bin/print-all-model --models-dir data/models-v2
 ```
 
 ## 모델 Training Status
 
 ```bash
-bin/train-status  data/models/acfa
-bin/train-status  data/models/ae_lstm
-bin/train-status  data/models/bpnet_cf
-bin/train-status  data/models/cnn_bilstm_at
-bin/train-status  data/models/conv_reg
-bin/train-status  data/models/conv_reg_at
-bin/train-status  data/models/conv_reg_ds
-bin/train-status  data/models/minception
-bin/train-status  data/models/mtae
-bin/train-status  data/models/mtae_tr
-bin/train-status  data/models/naive
-bin/train-status  data/models/pctn
-bin/train-status  data/models/resnet1d
-bin/train-status  data/models/resnet1d_micro
-bin/train-status  data/models/resnet1d_mini
-bin/train-status  data/models/resnet1d_tiny
-bin/train-status  data/models/st_resnet
-bin/train-status  data/models/xresnet1d
+bin/generate-train-status  data/models/acfa
+bin/generate-train-status  data/models/ae_lstm
+bin/generate-train-status  data/models/bpnet_cf
+bin/generate-train-status  data/models/cnn_bilstm_at
+bin/generate-train-status  data/models/conv_reg
+bin/generate-train-status  data/models/conv_reg_at
+bin/generate-train-status  data/models/conv_reg_ds
+bin/generate-train-status  data/models/minception
+bin/generate-train-status  data/models/mtae
+bin/generate-train-status  data/models/mtae_tr
+bin/generate-train-status  data/models/naive
+bin/generate-train-status  data/models/pctn
+bin/generate-train-status  data/models/resnet1d
+bin/generate-train-status  data/models/resnet1d_micro
+bin/generate-train-status  data/models/resnet1d_mini
+bin/generate-train-status  data/models/resnet1d_tiny
+bin/generate-train-status  data/models/st_resnet
+bin/generate-train-status  data/models/xresnet1d
 
-bin/train-status  data/models-v1/acfa
-bin/train-status  data/models-v1/ae_lstm
-bin/train-status  data/models-v1/bpnet_cf
-bin/train-status  data/models-v1/cnn_bilstm_at
-bin/train-status  data/models-v1/conv_reg
-bin/train-status  data/models-v1/conv_reg_at
-bin/train-status  data/models-v1/conv_reg_ds
-bin/train-status  data/models-v1/minception
-bin/train-status  data/models-v1/mtae
-bin/train-status  data/models-v1/mtae_tr
-bin/train-status  data/models-v1/naive
-bin/train-status  data/models-v1/pctn
-bin/train-status  data/models-v1/resnet1d
-bin/train-status  data/models-v1/resnet1d_micro
-bin/train-status  data/models-v1/resnet1d_mini
-bin/train-status  data/models-v1/resnet1d_tiny
-bin/train-status  data/models-v1/st_resnet
-bin/train-status  data/models-v1/xresnet1d
+bin/generate-train-status  data/models-v1/acfa
+bin/generate-train-status  data/models-v1/ae_lstm
+bin/generate-train-status  data/models-v1/bpnet_cf
+bin/generate-train-status  data/models-v1/cnn_bilstm_at
+bin/generate-train-status  data/models-v1/conv_reg
+bin/generate-train-status  data/models-v1/conv_reg_at
+bin/generate-train-status  data/models-v1/conv_reg_ds
+bin/generate-train-status  data/models-v1/minception
+bin/generate-train-status  data/models-v1/mtae
+bin/generate-train-status  data/models-v1/mtae_tr
+bin/generate-train-status  data/models-v1/naive
+bin/generate-train-status  data/models-v1/pctn
+bin/generate-train-status  data/models-v1/resnet1d
+bin/generate-train-status  data/models-v1/resnet1d_micro
+bin/generate-train-status  data/models-v1/resnet1d_mini
+bin/generate-train-status  data/models-v1/resnet1d_tiny
+bin/generate-train-status  data/models-v1/st_resnet
+bin/generate-train-status  data/models-v1/xresnet1d
 
-bin/train-status  data/models-v2/acfa
-bin/train-status  data/models-v2/ae_lstm
-bin/train-status  data/models-v2/bpnet_cf
-bin/train-status  data/models-v2/cnn_bilstm_at
-bin/train-status  data/models-v2/conv_reg
-bin/train-status  data/models-v2/conv_reg_at
-bin/train-status  data/models-v2/conv_reg_ds
-bin/train-status  data/models-v2/minception
-bin/train-status  data/models-v2/mtae
-bin/train-status  data/models-v2/mtae_tr
-bin/train-status  data/models-v2/naive
-bin/train-status  data/models-v2/pctn
-bin/train-status  data/models-v2/resnet1d
-bin/train-status  data/models-v2/resnet1d_micro
-bin/train-status  data/models-v2/resnet1d_mini
-bin/train-status  data/models-v2/resnet1d_tiny
-bin/train-status  data/models-v2/st_resnet
-bin/train-status  data/models-v2/xresnet1d
+bin/generate-train-status  data/models-v2/acfa
+bin/generate-train-status  data/models-v2/ae_lstm
+bin/generate-train-status  data/models-v2/bpnet_cf
+bin/generate-train-status  data/models-v2/cnn_bilstm_at
+bin/generate-train-status  data/models-v2/conv_reg
+bin/generate-train-status  data/models-v2/conv_reg_at
+bin/generate-train-status  data/models-v2/conv_reg_ds
+bin/generate-train-status  data/models-v2/minception
+bin/generate-train-status  data/models-v2/mtae
+bin/generate-train-status  data/models-v2/mtae_tr
+bin/generate-train-status  data/models-v2/naive
+bin/generate-train-status  data/models-v2/pctn
+bin/generate-train-status  data/models-v2/resnet1d
+bin/generate-train-status  data/models-v2/resnet1d_micro
+bin/generate-train-status  data/models-v2/resnet1d_mini
+bin/generate-train-status  data/models-v2/resnet1d_tiny
+bin/generate-train-status  data/models-v2/st_resnet
+bin/generate-train-status  data/models-v2/xresnet1d
+
+bin/generate-all-train-status
+bin/generate-all-train-status --models-dir data/models-v1
+bin/generate-all-train-status --models-dir data/models-v2
 ```
 
 ## 모델 평가

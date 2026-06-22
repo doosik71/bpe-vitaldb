@@ -69,7 +69,7 @@ uv run python scripts/train-model.py --model xresnet1d --device cuda:0
 | 옵션            | 기본값         | 설명                          |
 | --------------- | -------------- | ----------------------------- |
 | `--dataset-dir` | `data/dataset` | NPZ 데이터셋 루트 디렉터리    |
-| `--output-dir`  | `data/models`  | 체크포인트 저장 루트 디렉터리 |
+| `--models-dir`  | `data/models`  | 체크포인트 저장 루트 디렉터리 |
 | `--resume`      | —              | 재개할 체크포인트 `.pt` 경로  |
 
 ### 학습 하이퍼파라미터
@@ -267,7 +267,7 @@ result  = trainer.fit(train_loader, val_loader, epochs=epochs, patience=patience
 {
   "model": "resnet1d",
   "dataset_dir": "data/dataset",
-  "output_dir": "data/models",
+  "models_dir": "data/models",
   "epochs": 100,
   "batch_size": 256,
   "lr": 0.001,
@@ -303,11 +303,11 @@ start_epoch = ckpt.get("epoch", 0)
 
 ## 6. 학습 결과 확인
 
-학습 중 또는 완료 후 손실/MAE 그래프를 확인하려면 `train-status.py`를 사용한다.
+학습 중 또는 완료 후 손실/MAE 그래프를 확인하려면 `generate-train-status.py`를 사용한다.
 
 ```bash
-bin/train-status     data/models/resnet1d   # Linux / macOS
-bin\train-status.bat data\models\resnet1d   # Windows
+bin/generate-train-status     data/models/resnet1d   # Linux / macOS
+bin\generate-train-status.bat data\models\resnet1d   # Windows
 ```
 
 학습된 모델을 테스트 세트로 평가하려면 `eval-model.py`를 사용한다.
@@ -325,5 +325,5 @@ bin\eval-model.bat data\models\resnet1d   # Windows
 | `bpe/train/dataset.py`    | `PPGDataset` — NPZ 로더, z-score 정규화, 샘플 가중치          |
 | `bpe/train/augment.py`    | 데이터 증강 클래스들 (`GaussianNoise`, `AmplitudeScaling`, …) |
 | `bpe/train/trainer.py`    | `Trainer` — 학습/검증 루프, 체크포인트, metrics.csv           |
-| `scripts/train-status.py` | 학습 곡선 시각화                                              |
+| `scripts/generate-train-status.py` | 학습 곡선 시각화                                              |
 | `scripts/eval-model.py`   | 테스트 세트 평가 (MAE, RMSE, BHS, AAMI)                       |

@@ -122,7 +122,7 @@ y  float32  (N, 2)      [SBP_mean, DBP_mean] mmHg — ABP peak/foot 평균
 | 옵션            | 기본값            | 설명                                              |
 | --------------- | ----------------- | ------------------------------------------------- |
 | `--data-dir`    | `data/vitaldb`    | 원본 `.vital` 파일 디렉터리                       |
-| `--output-dir`  | `data/dataset-v2` | 출력 루트 디렉터리                                |
+| `--dataset-dir`  | `data/dataset-v2` | 출력 루트 디렉터리                                |
 | `--split`       | `0.7 0.1 0.2`     | train / val / test 케이스 비율 (합계 = 1.0)       |
 | `--target-hz`   | `125`             | 출력 PPG 샘플링 주파수 (Hz); 500의 약수여야 함    |
 | `--segment-sec` | `8`               | 세그먼트 길이 (초); stride는 자동으로 절반(`//2`) |
@@ -161,7 +161,7 @@ uv run python scripts/construct-dataset-v2.py
 # 입출력 디렉터리 명시
 uv run python scripts/construct-dataset-v2.py \
   --data-dir data/vitaldb \
-  --output-dir data/dataset-v2
+  --dataset-dir data/dataset-v2
 
 # 더 엄격한 HR 범위 (40–130 bpm)
 uv run python scripts/construct-dataset-v2.py \

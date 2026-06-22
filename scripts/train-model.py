@@ -11,7 +11,7 @@ Options:
                          Available: resnet1d, st_resnet, minception,
                                     xresnet1d
     --dataset-dir        Root dataset directory        (default: data/dataset)
-    --output-dir         Root models directory         (default: data/models)
+    --models-dir         Root models directory         (default: data/models)
     --epochs             Maximum training epochs       (default: 100)
     --batch-size         Mini-batch size               (default: 256)
     --lr                 Initial learning rate         (default: 1e-3)
@@ -84,7 +84,7 @@ def parse_args() -> argparse.Namespace:
         help="Root dataset directory (default: data/dataset)",
     )
     p.add_argument(
-        "--output-dir", type=Path, default=Path("data/models"),
+        "--models-dir", type=Path, default=Path("data/models"),
         help="Root directory for saved runs (default: data/models)",
     )
     p.add_argument(
@@ -335,7 +335,7 @@ def main() -> None:
     # -- Optional resume -------------------------------------------------------
     resume_path = args.resume
     if resume_path is None:
-        candidate = args.output_dir / args.model / "last.pt"
+        candidate = args.models_dir / args.model / "last.pt"
         if candidate.exists():
             resume_path = candidate
             log.info("Auto-detected checkpoint: %s", resume_path)
@@ -345,7 +345,7 @@ def main() -> None:
         resume_state = load_resume(model, optimizer, scheduler, resume_path, device)
 
     # -- Run directory and config ----------------------------------------------
-    run_dir = make_run_dir(args.output_dir, args.model)
+    run_dir = make_run_dir(args.models_dir, args.model)
     save_config(run_dir, args)
     log.info("Run directory: %s", run_dir)
 
@@ -383,7 +383,7 @@ def main() -> None:
     log.info("Checkpoints : %s", run_dir)
 
     # Append a summary JSON for quick comparison across runs
-    summary_path = args.output_dir / args.model / "runs.jsonl"
+    summary_path = args.models_dir / args.model / "runs.jsonl"
     with open(summary_path, "a", encoding="utf-8") as f:
         import json as _json
         _json.dump(

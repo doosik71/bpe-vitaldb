@@ -8,7 +8,7 @@
 #
 # Per-model loop (repeated for every model in the list):
 #   4  Train the model
-#   5  Plot training curves (train-status)  (non-critical)
+#   5  Plot training curves (generate-train-status)  (non-critical)
 #   6  Evaluate model on the test set
 #      (pulsewoq_resnet1d uses eval-model-pulsewoq.py automatically)
 #
@@ -158,7 +158,7 @@ step_header "Download VitalDB"
 if [[ "$SKIP_DOWNLOAD" -eq 1 ]]; then
     echo "  [SKIP] --skip-download specified."
 else
-    DOWNLOAD_ARGS=(--output-dir "$DATA_DIR" --filter-tracks)
+    DOWNLOAD_ARGS=(--vitaldb-dir "$DATA_DIR" --filter-tracks)
     [[ -n "$MAX_CASES" ]] && DOWNLOAD_ARGS+=(--max-cases "$MAX_CASES")
     uv run python scripts/download-vitaldb.py "${DOWNLOAD_ARGS[@]}" \
         || die "download-vitaldb.py failed."
@@ -170,7 +170,7 @@ if [[ "$SKIP_BUILD" -eq 1 ]]; then
 else
     uv run python scripts/construct-dataset.py \
         --data-dir   "$DATA_DIR" \
-        --output-dir "$DATASET_DIR" \
+        --dataset-dir "$DATASET_DIR" \
         || die "construct-dataset.py failed."
 fi
 
@@ -190,7 +190,7 @@ for MODEL in "${MODELS[@]}"; do
     if uv run python scripts/train-model.py \
             --model       "$MODEL" \
             --dataset-dir "$DATASET_DIR" \
-            --output-dir  "$MODELS_DIR" \
+            --models-dir  "$MODELS_DIR" \
             --epochs      "$EPOCHS" \
             --batch-size  "$BATCH_SIZE" \
             --device      "$DEVICE" \
@@ -207,7 +207,7 @@ for MODEL in "${MODELS[@]}"; do
 
     # ── Training status ──────────────────────────────────────────────────────
     step_header "Training Status: $MODEL_LABEL"
-    soft "train-status:$MODEL" uv run python scripts/train-status.py "$RUN_DIR"
+    soft "generate-train-status:$MODEL" uv run python scripts/generate-train-status.py "$RUN_DIR"
 
     # ── Evaluate ─────────────────────────────────────────────────────────────
     step_header "Evaluate: $MODEL_LABEL"

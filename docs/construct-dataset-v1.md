@@ -65,7 +65,7 @@ uv run python scripts/construct-dataset-v1.py
 # 입력/출력 디렉터리 명시
 uv run python scripts/construct-dataset-v1.py \
   --input-dir data/dataset \
-  --output-dir data/dataset-v1
+  --dataset-dir data/dataset-v1
 
 # 임계값 높이기 (더 엄격한 선별)
 uv run python scripts/construct-dataset-v1.py \
@@ -82,7 +82,7 @@ uv run python scripts/construct-dataset-v1.py \
 # 전체 옵션 조합 예시
 uv run python scripts/construct-dataset-v1.py \
   --input-dir data/dataset \
-  --output-dir data/dataset-v1 \
+  --dataset-dir data/dataset-v1 \
   --target-hz 125 \
   --nperseg 256 \
   --power-ratio-min 0.6 \
@@ -94,7 +94,7 @@ uv run python scripts/construct-dataset-v1.py \
 | 옵션                | 기본값            | 설명                                                |
 | ------------------- | ----------------- | --------------------------------------------------- |
 | `--input-dir`       | `data/dataset`    | 원본 NPZ 데이터셋 루트 디렉터리                     |
-| `--output-dir`      | `data/dataset-v1` | 선별된 NPZ 출력 루트 디렉터리                       |
+| `--dataset-dir`      | `data/dataset-v1` | 선별된 NPZ 출력 루트 디렉터리                       |
 | `--target-hz`       | `125`             | PPG 샘플링 주파수 (Hz); Welch PSD 계산에 사용       |
 | `--nperseg`         | `256`             | Welch 세그먼트 길이 (샘플 수); 주파수 해상도 결정   |
 | `--power-ratio-min` | `0.6`             | 허용 최소 power_ratio; 이 값 미만인 세그먼트는 제거 |

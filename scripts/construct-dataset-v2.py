@@ -16,7 +16,7 @@ Labels are derived directly from ABP waveform peaks and foot points:
     DBP = mean(ABP[foot_indices])
 
 Output layout:
-    <output-dir>/
+    <dataset-dir>/
         train/  <caseid>.npz
         val/    <caseid>.npz
         test/   <caseid>.npz
@@ -37,11 +37,11 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-from scipy.fft import fft
-from scipy.signal import butter, find_peaks, sosfiltfilt
-from scipy.stats import skew
+from scipy.signal import butter, sosfiltfilt
 from tqdm import tqdm
 from vitaldb.utils import VitalFile
+
+from bpe.utils.qc_v2 import QCParams, check_segment_quality
 
 SOURCE_HZ = 500
 
@@ -49,12 +49,7 @@ BANDPASS_LO = 0.5
 BANDPASS_HI = 10.0
 BANDPASS_ORDER = 4
 
-ABP_PEAK_LO = 0.5
-ABP_PEAK_HI = 8.0
-ABP_PEAK_ORDER = 3
-
 INDEX_FILE = "index.csv"
-SENTINEL_NAN = -9999.0
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +59,7 @@ def parse_args() -> argparse.Namespace:
         description="Build filtered NPZ dataset-v2 directly from VitalDB .vital files",
     )
     p.add_argument("--data-dir", type=Path, default=Path("data/vitaldb"))
-    p.add_argument("--output-dir", type=Path, default=Path("data/dataset-v2"))
+    p.add_argument("--dataset-dir", type=Path, default=Path("data/dataset-v2"))
     p.add_argument(
         "--split",
         type=float,
@@ -140,327 +135,6 @@ def _append_index_row(csv_path: Path, case_id: str, n_segs: int, lock) -> None:
             csv.writer(f).writerow([case_id, n_segs])
 
 
-def _nan_linear_interp(signal: np.ndarray) -> np.ndarray:
-    out = signal.astype(np.float32, copy=True)
-    nan_mask = np.isnan(out)
-    if not np.any(nan_mask):
-        return out
-    valid = np.flatnonzero(~nan_mask)
-    if valid.size == 0:
-        return out
-    out[nan_mask] = np.interp(np.flatnonzero(nan_mask), valid, out[valid])
-    return out
-
-
-def _repetition_fail(signal: np.ndarray, contlen: int) -> bool:
-    replaced = np.where(np.isnan(signal), SENTINEL_NAN, signal)
-    patience = 0
-    prev = None
-    for value in replaced:
-        patience = patience + 1 if prev is not None and value == prev else 1
-        if patience > contlen:
-            return True
-        prev = value
-    return False
-
-
-def _rule1_repetition_and_interpolation(
-    abp: np.ndarray,
-    ppg: np.ndarray,
-    contlen: int,
-) -> tuple[np.ndarray, np.ndarray] | None:
-    if _repetition_fail(abp, contlen):
-        return None
-    if _repetition_fail(ppg, contlen):
-        return None
-    return _nan_linear_interp(abp), _nan_linear_interp(ppg)
-
-
-def _safe_peak_distance(value: float) -> int:
-    return max(1, int(round(value)))
-
-
-def _threshold_from_candidates(signal: np.ndarray, candidates: np.ndarray) -> float | None:
-    if candidates.size == 0:
-        return None
-    vals = signal[candidates]
-    return float((np.mean(vals) - np.min(signal)) * 0.6 + np.min(signal))
-
-
-def _find_abp_peak_foots(signal: np.ndarray, fs: int) -> tuple[np.ndarray, np.ndarray]:
-    try:
-        filtered = _bandpass_filter(
-            signal,
-            fs,
-            lo=ABP_PEAK_LO,
-            hi=ABP_PEAK_HI,
-            order=ABP_PEAK_ORDER,
-        )
-        src = signal if np.isnan(filtered).any() else filtered
-    except Exception:
-        src = signal
-
-    peak_candidates, _ = find_peaks(
-        src,
-        distance=_safe_peak_distance(fs * 0.35),
-        width=max(1, fs * 0.05),
-    )
-    peak_thres = _threshold_from_candidates(src, peak_candidates)
-    if peak_thres is None:
-        return np.array([], dtype=np.int64), np.array([], dtype=np.int64)
-    peaks, _ = find_peaks(
-        src,
-        distance=_safe_peak_distance(fs * 0.35),
-        height=peak_thres,
-        width=max(1, fs * 0.05),
-    )
-    if peaks.size < 2:
-        return peaks.astype(np.int64), np.array([], dtype=np.int64)
-
-    inv = np.max(src) - src
-    ppi = float(np.mean(np.diff(peaks)))
-    foot_candidates, _ = find_peaks(
-        inv,
-        distance=_safe_peak_distance(fs * 0.5),
-        width=max(1, fs * 0.06),
-    )
-    foot_thres = _threshold_from_candidates(inv, foot_candidates)
-    if foot_thres is None:
-        return peaks.astype(np.int64), np.array([], dtype=np.int64)
-    foots, _ = find_peaks(
-        inv,
-        distance=_safe_peak_distance(ppi * 0.5),
-        height=foot_thres,
-        width=max(1, fs * 0.06),
-    )
-    return peaks.astype(np.int64), foots.astype(np.int64)
-
-
-def _find_ppg_peak_foots(signal: np.ndarray, fs: int) -> tuple[np.ndarray, np.ndarray]:
-    peak_candidates, _ = find_peaks(
-        signal,
-        distance=_safe_peak_distance(fs * 0.35),
-        width=max(1, fs * 0.1),
-    )
-    peak_thres = _threshold_from_candidates(signal, peak_candidates)
-    if peak_thres is None:
-        return np.array([], dtype=np.int64), np.array([], dtype=np.int64)
-    peaks, _ = find_peaks(
-        signal,
-        distance=_safe_peak_distance(fs * 0.35),
-        height=peak_thres,
-        width=max(1, fs * 0.1),
-    )
-    if peaks.size < 2:
-        return peaks.astype(np.int64), np.array([], dtype=np.int64)
-
-    inv = np.max(signal) - signal
-    ppi = float(np.mean(np.diff(peaks)))
-    foot_candidates, _ = find_peaks(
-        inv,
-        distance=_safe_peak_distance(ppi * 0.5),
-        width=max(1, fs * 0.1),
-    )
-    foot_thres = _threshold_from_candidates(inv, foot_candidates)
-    if foot_thres is None:
-        return peaks.astype(np.int64), np.array([], dtype=np.int64)
-    foots, _ = find_peaks(
-        inv,
-        distance=_safe_peak_distance(ppi * 0.5),
-        height=foot_thres,
-        width=max(1, fs * 0.1),
-    )
-    return peaks.astype(np.int64), foots.astype(np.int64)
-
-
-def _heart_rate_from_points(points: np.ndarray, fs: int) -> float | None:
-    if points.size < 2:
-        return None
-    interval = float(np.mean(np.diff(points))) / fs
-    if interval <= 0:
-        return None
-    return float(60.0 / interval)
-
-
-def _avg_heart_rate(peaks: np.ndarray, foots: np.ndarray, fs: int) -> float | None:
-    hr_peak = _heart_rate_from_points(peaks, fs)
-    hr_foot = _heart_rate_from_points(foots, fs)
-    if hr_peak is None or hr_foot is None:
-        return None
-    return float((hr_peak + hr_foot) / 2.0)
-
-
-def _minmax_scale(signal: np.ndarray) -> np.ndarray:
-    lo = float(np.min(signal))
-    hi = float(np.max(signal))
-    if hi <= lo:
-        return np.zeros_like(signal, dtype=np.float32)
-    return ((signal - lo) / (hi - lo)).astype(np.float32)
-
-
-def _fasqa_adaptive(
-    signal: np.ndarray,
-    fs: int,
-    peaks: np.ndarray,
-    foots: np.ndarray,
-    *,
-    psd_low_max: float,
-    psd_tgt_min: float,
-    psd_high_max: float,
-) -> tuple[bool, tuple[float, float, float, float]]:
-    n = len(signal)
-    if n < 4:
-        return False, (0.0, 0.0, 0.0, 0.0)
-
-    hr_peak = _heart_rate_from_points(peaks, fs)
-    hr_foot = _heart_rate_from_points(foots, fs)
-    if foots.size == 0 or hr_peak is None or hr_foot is None:
-        return False, (0.0, 0.0, 0.0, 0.0)
-    if hr_foot < 40.0 or abs(hr_peak - hr_foot) > 5.0:
-        return False, (0.0, 0.0, 0.0, 0.0)
-
-    yf = fft(signal)[: n // 2]
-    psd = 2.0 * np.abs(yf) / n
-    if psd.size <= 1:
-        return False, (0.0, 0.0, 0.0, 0.0)
-
-    total = float(np.sum(psd[1:]))
-    if total == 0.0:
-        return False, (0.0, 0.0, 0.0, 0.0)
-
-    delta_freq = fs / n
-    low_idx  = max(1, int(round(((hr_foot / 60.0) - 0.25) / delta_freq)))
-    tgt_idx  = max(low_idx + 1, int(round(((hr_foot / 60.0) + 0.25) / delta_freq)))
-    high_idx = int(round(7.0 / delta_freq))
-
-    psd_low    = float(np.sum(psd[1:low_idx]) / total)
-    psd_target = float(np.sum(psd[low_idx:tgt_idx]) / total)
-    psd_high   = float(np.sum(psd[high_idx:]) / total) if high_idx < len(psd) else 0.0
-    psdr       = float(np.sum(psd[low_idx:]) / total)  # PSDR: HR 대역 이상 전체 비율
-
-    passed = (
-        psd_low    < psd_low_max
-        and psd_target > psd_tgt_min
-        and psd_high   < psd_high_max
-    )
-    return passed, (psd_low, psd_target, psd_high, psdr)
-
-
-def _average_cycle_skewness(foots: np.ndarray, signal: np.ndarray) -> float:
-    if foots.size < 2:
-        return -1.0
-    values: list[float] = []
-    for start, end in zip(foots[:-1], foots[1:]):
-        if end - start < 3:
-            continue
-        skew_val = float(skew(signal[start:end]))
-        if np.isfinite(skew_val):
-            values.append(skew_val)
-    if not values:
-        return -1.0
-    return float(np.mean(values))
-
-
-def _segment_label_and_quality(
-    ppg_seg: np.ndarray,
-    abp_seg: np.ndarray,
-    abp_raw_seg: np.ndarray,
-    fs: int,
-    args: argparse.Namespace,
-) -> tuple[np.ndarray, list[float]] | int:
-    """
-    ppg_seg     — BPF 적용 PPG 세그먼트 (peak 검출 및 FASQA에 사용)
-    abp_seg     — BPF 적용 ABP 세그먼트 (peak 검출 및 FASQA에 사용)
-    abp_raw_seg — BPF 미적용 decimated ABP 원본 (레이블·혈압 범위·변동성 검사에 사용)
-
-    Returns (ppg_seg, [avg_sbp, avg_dbp]) on success, or int failed_rule (1-9) on failure.
-    """
-    if not np.all(np.isfinite(ppg_seg)) or not np.all(np.isfinite(abp_seg)):
-        return 1
-
-    fixed = _rule1_repetition_and_interpolation(abp_seg, ppg_seg, args.contlen)
-    if fixed is None:
-        return 1
-    abp_seg, ppg_seg = fixed
-
-    abp_peaks, abp_foots = _find_abp_peak_foots(abp_seg, fs)
-    ppg_peaks, ppg_foots = _find_ppg_peak_foots(ppg_seg, fs)
-
-    # Rule 2: FASQA — ABP
-    abp_ok, _ = _fasqa_adaptive(
-        abp_seg,
-        fs,
-        abp_peaks,
-        abp_foots,
-        psd_low_max=args.fasqa_psd_low_max,
-        psd_tgt_min=args.fasqa_psd_tgt_min,
-        psd_high_max=args.fasqa_psd_high_max,
-    )
-    if not abp_ok:
-        return 2
-
-    # Rule 2: FASQA — PPG (Min-Max 정규화 후)
-    ppg_ok, _ = _fasqa_adaptive(
-        _minmax_scale(ppg_seg),
-        fs,
-        ppg_peaks,
-        ppg_foots,
-        psd_low_max=args.fasqa_psd_low_max,
-        psd_tgt_min=args.fasqa_psd_tgt_min,
-        psd_high_max=args.fasqa_psd_high_max,
-    )
-    if not ppg_ok:
-        return 2
-
-    # 레이블 사전 산출: BPF 미적용 원신호에서 절대 mmHg 값 추출 (Rule 3, 8에서 필요)
-    if abp_peaks.size == 0 or abp_foots.size == 0:
-        return 3
-    avg_sbp = float(np.mean(abp_raw_seg[abp_peaks]))
-    avg_dbp = float(np.mean(abp_raw_seg[abp_foots]))
-
-    # Rule 3: 혈압 범위 검사
-    if not (args.sbp_min <= avg_sbp <= args.sbp_max and args.dbp_min <= avg_dbp <= args.dbp_max):
-        return 3
-    # 기본: SBP > DBP 생리적 일관성 검사 — Rule 3으로 분류
-    if avg_sbp <= avg_dbp:
-        return 3
-
-    # Rule 4: 심박수 범위 검사
-    hr_abp = _avg_heart_rate(abp_peaks, abp_foots, fs)
-    hr_ppg = _avg_heart_rate(ppg_peaks, ppg_foots, fs)
-    if hr_abp is None or hr_ppg is None:
-        return 4
-    if not (args.hr_min <= hr_abp <= args.hr_max and args.hr_min <= hr_ppg <= args.hr_max):
-        return 4
-
-    # Rule 5: ABP–PPG 심박수 일치 검사
-    if abs(hr_abp - hr_ppg) > args.hr_diff_max:
-        return 5
-
-    # Rule 6: Peak/Foot 개수 차이 검사
-    if (
-        abs(len(abp_peaks) - len(abp_foots)) > args.peak_foot_diff_max
-        or abs(len(ppg_peaks) - len(ppg_foots)) > args.peak_foot_diff_max
-    ):
-        return 6
-
-    # Rule 7: 최소 Peak/Foot 개수 검사
-    if len(abp_peaks) < args.min_peaks or len(abp_foots) < args.min_peaks:
-        return 7
-
-    # Rule 8: 세그먼트 내 혈압 변동 범위 검사 (원신호 기준)
-    if np.ptp(abp_raw_seg[abp_peaks]) > args.sbp_range_max:
-        return 8
-    if np.ptp(abp_raw_seg[abp_foots]) > args.dbp_range_max:
-        return 8
-
-    # Rule 9: PPG Skewness 검사
-    if _average_cycle_skewness(ppg_foots, ppg_seg) <= 0.0:
-        return 9
-
-    return ppg_seg.astype(np.float32), [avg_sbp, avg_dbp]
-
-
 def process_case(
     path: Path,
     *,
@@ -483,6 +157,24 @@ def process_case(
     stride_sec = args.segment_sec // 2
     stride_samples = stride_sec * args.target_hz
     guard_samples = guard_sec * args.target_hz
+
+    qc_params = QCParams(
+        contlen=args.contlen,
+        sbp_min=args.sbp_min,
+        sbp_max=args.sbp_max,
+        dbp_min=args.dbp_min,
+        dbp_max=args.dbp_max,
+        hr_min=args.hr_min,
+        hr_max=args.hr_max,
+        hr_diff_max=args.hr_diff_max,
+        peak_foot_diff_max=args.peak_foot_diff_max,
+        min_peaks=args.min_peaks,
+        sbp_range_max=args.sbp_range_max,
+        dbp_range_max=args.dbp_range_max,
+        fasqa_psd_low_max=args.fasqa_psd_low_max,
+        fasqa_psd_tgt_min=args.fasqa_psd_tgt_min,
+        fasqa_psd_high_max=args.fasqa_psd_high_max,
+    )
 
     try:
         vf = VitalFile(str(path))
@@ -545,14 +237,15 @@ def process_case(
         ppg_seg     = ppg_filtered[guard_samples : guard_samples + segment_samples]
         abp_seg     = abp_filtered[guard_samples : guard_samples + segment_samples]
         abp_raw_seg = abp[ps:pe]  # BPF 미적용 decimated 원신호 — 레이블 mmHg 값 산출용
-        result = _segment_label_and_quality(ppg_seg, abp_seg, abp_raw_seg, args.target_hz, args)
-        if isinstance(result, int):
-            rule_rejects[result] = rule_rejects.get(result, 0) + 1
+
+        qc = check_segment_quality(ppg_seg, abp_seg, abp_raw_seg, args.target_hz, t_start=0.0, params=qc_params)
+        if not qc.passed:
+            rule = qc.failed_rule or 1
+            rule_rejects[rule] = rule_rejects.get(rule, 0) + 1
             continue
 
-        x_seg, label = result
-        xs.append(x_seg)
-        ys.append(label)
+        xs.append(ppg_seg.astype(np.float32))
+        ys.append([qc.avg_sbp, qc.avg_dbp])
 
     if not xs:
         return None, None, n_windows_evaluated, rule_rejects
@@ -662,13 +355,13 @@ def main() -> None:
 
     for split_name, files in splits.items():
         log.info("  %-5s : %d cases", split_name, len(files))
-        (args.output_dir / split_name).mkdir(parents=True, exist_ok=True)
+        (args.dataset_dir / split_name).mkdir(parents=True, exist_ok=True)
 
     for split_name, files in splits.items():
         expected = {p.stem for p in files}
         orphans = [
             npz.stem
-            for npz in (args.output_dir / split_name).glob("*.npz")
+            for npz in (args.dataset_dir / split_name).glob("*.npz")
             if npz.stem not in expected
         ]
         if orphans:
@@ -681,13 +374,13 @@ def main() -> None:
             )
 
     all_tasks: list[tuple[Path, Path, str]] = [
-        (path, args.output_dir / split_name, split_name)
+        (path, args.dataset_dir / split_name, split_name)
         for split_name, files in splits.items()
         for path in files
     ]
 
     csv_paths: dict[str, Path] = {
-        split_name: args.output_dir / split_name / INDEX_FILE
+        split_name: args.dataset_dir / split_name / INDEX_FILE
         for split_name in splits
     }
 
@@ -704,7 +397,7 @@ def main() -> None:
         for split_name, csv_path in csv_paths.items():
             if not csv_path.exists():
                 index: dict[str, int] = {}
-                existing_npzs = sorted((args.output_dir / split_name).glob("*.npz"))
+                existing_npzs = sorted((args.dataset_dir / split_name).glob("*.npz"))
                 if existing_npzs:
                     log.info(
                         "  %-5s : building index.csv from %d existing NPZ files ...",
@@ -821,7 +514,7 @@ def main() -> None:
         )
     log.info("  " + "-" * 42)
     log.info("  %-5s   %12s   %12s   %5.1f%%", "total", f"{total_new:,}", f"{total_all:,}", 100.0)
-    log.info("Output written to %s", args.output_dir.resolve())
+    log.info("Output written to %s", args.dataset_dir.resolve())
 
     # ------------------------------------------------------------------
     # Write construction-results.json
@@ -911,7 +604,7 @@ def main() -> None:
             f"{total_cases_resumed} resumed case(s) are not included in those counts."
         )
 
-    json_path = args.output_dir / "construction-results.json"
+    json_path = args.dataset_dir / "construction-results.json"
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(results_doc, f, indent=2, ensure_ascii=False)
     log.info("Construction results written to %s", json_path)

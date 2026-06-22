@@ -55,7 +55,7 @@ bpe-vitaldb/
 │   ├── download-shared-data.bat    # download data/ from a remote share-data host
 │   ├── print-model.bat             # run scripts/print-model.py
 │   ├── train-model.bat             # run scripts/train-model.py
-│   ├── train-status.bat            # run scripts/train-status.py
+│   ├── generate-train-status.bat            # run scripts/generate-train-status.py
 │   └── eval-model.bat              # run scripts/eval-model.py
 ├── scripts/
 │   ├── download-vitaldb.py         # parallel .vital file downloader
@@ -65,7 +65,7 @@ bpe-vitaldb/
 │   ├── share-data.py               # multi-threaded HTTP file server
 │   ├── print-model.py              # layer structure and output shape inspector
 │   ├── train-model.py              # model training pipeline
-│   ├── train-status.py             # plot training metrics from a run directory
+│   ├── generate-train-status.py             # plot training metrics from a run directory
 │   └── eval-model.py               # evaluate best.pt on the test split
 ├── data/
 │   ├── vitaldb/                    # downloaded .vital files (git-ignored)
@@ -110,7 +110,7 @@ bin\download-vitaldb.bat --filter-tracks
 
 | Option                        | Default        | Description                                     |
 | ----------------------------- | -------------- | ----------------------------------------------- |
-| `--output-dir`                | `data/vitaldb` | Download destination                            |
+| `--vitaldb-dir`               | `data/vitaldb` | Download destination                            |
 | `--max-cases`                 | all            | Limit number of cases                           |
 | `--start-case` / `--end-case` | 1 / 6388       | Case ID range                                   |
 | `--workers`                   | 4              | Parallel download threads                       |
@@ -151,7 +151,7 @@ data leakage.
 | Option          | Default        | Description                        |
 | --------------- | -------------- | ---------------------------------- |
 | `--data-dir`    | `data/vitaldb` | Source directory of `.vital` files |
-| `--output-dir`  | `data/dataset` | Root output directory              |
+| `--dataset-dir` | `data/dataset` | Root output directory              |
 | `--split`       | `0.6 0.2 0.2`  | Train / val / test case ratios     |
 | `--target-hz`   | `125`          | Output PPG sample rate (Hz)        |
 | `--segment-sec` | `8`            | Window duration in seconds         |
@@ -330,7 +330,7 @@ Checkpoints and a metrics CSV are saved under
 | ---------------- | -------------- | ------------------------------------------ |
 | `--model`        | *(required)*   | Model name from the registry               |
 | `--dataset-dir`  | `data/dataset` | Root dataset directory                     |
-| `--output-dir`   | `data/models`  | Root directory for saved runs              |
+| `--models-dir`   | `data/models`  | Root directory for saved runs              |
 | `--epochs`       | `100`          | Maximum training epochs                    |
 | `--batch-size`   | `256`          | Mini-batch size                            |
 | `--lr`           | `1e-3`         | Initial learning rate                      |
@@ -350,8 +350,8 @@ Run `bin\train-model.bat --help` for the full option listing.
 Plot loss and MAE curves for any run while training is in progress or after it completes:
 
 ```bash
-bin\train-status.bat data\models\resnet1d   # Windows
-bin/train-status     data/models/resnet1d   # Linux / macOS
+bin\generate-train-status.bat data\models\resnet1d   # Windows
+bin/generate-train-status     data/models/resnet1d   # Linux / macOS
 ```
 
 Two PNG files are written next to `metrics.csv` inside the run directory:

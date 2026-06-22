@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Generate training status graphs for all registered BPE models.
+#
+# For each model in bpe.models.list_models(), runs generate-train-status.py
+# if metrics.csv exists. Models without metrics.csv are skipped.
+#
+# Usage:
+#   bin/generate-all-train-status
+#   bin/generate-all-train-status --models-dir data/models-v1
+#   bin/generate-all-train-status --dry-run
+#
+# Options:
+#   --models-dir <path>    Root directory of trained models  (default: data/models)
+#   --dry-run              Print commands without executing them
+#   --no-save              Forwarded to generate-train-status.py; print only, no PNG
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec uv run python scripts/generate-all-train-status.py "$@"

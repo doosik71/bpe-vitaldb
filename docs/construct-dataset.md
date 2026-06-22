@@ -84,7 +84,7 @@ bin/construct-dataset.bat
 ```bash
 uv run python scripts/construct-dataset.py \
   --data-dir data/vitaldb \
-  --output-dir data/dataset \
+  --dataset-dir data/dataset \
   --split 0.7 0.1 0.2 \
   --target-hz 125 \
   --segment-sec 8 \
@@ -98,7 +98,7 @@ uv run python scripts/construct-dataset.py \
 - `--data-dir`
   - 원본 `.vital` 파일 디렉터리
   - 기본값: `data/vitaldb`
-- `--output-dir`
+- `--dataset-dir`
   - 생성된 `NPZ` 데이터셋 루트 디렉터리
   - 기본값: `data/dataset`
 - `--split TRAIN VAL TEST`
@@ -139,7 +139,7 @@ uv run python scripts/construct-dataset.py --target-hz 100
 출력 경로를 별도로 분리:
 
 ```bash
-uv run python scripts/construct-dataset.py --output-dir data/dataset-125hz
+uv run python scripts/construct-dataset.py --dataset-dir data/dataset-125hz
 ```
 
 분할 비율 변경:

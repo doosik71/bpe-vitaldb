@@ -46,12 +46,12 @@ uv run python scripts/train-all-model.py
 # v1 데이터셋과 별도 모델 출력 디렉터리 사용
 uv run python scripts/train-all-model.py \
   --dataset-dir data/dataset-v1 \
-  --output-dir data/models-v1
+  --models-dir data/models-v1
 
 # 짧은 테스트 학습
 uv run python scripts/train-all-model.py \
   --dataset-dir data/dataset-v1 \
-  --output-dir data/models-v1 \
+  --models-dir data/models-v1 \
   --epochs 5 \
   --batch-size 64
 
@@ -59,7 +59,7 @@ uv run python scripts/train-all-model.py \
 uv run python scripts/train-all-model.py \
   --dry-run \
   --dataset-dir data/dataset-v1 \
-  --output-dir data/models-v1
+  --models-dir data/models-v1
 ```
 
 ## 3. CLI 옵션
@@ -82,7 +82,7 @@ uv run python scripts/train-all-model.py \
 | 옵션                   | 전달 대상        | 설명                      |
 | ---------------------- | ---------------- | ------------------------- |
 | `--dataset-dir`        | `train-model.py` | 입력 데이터셋 루트        |
-| `--output-dir`         | `train-model.py` | 모델 출력 루트            |
+| `--models-dir`         | `train-model.py` | 모델 출력 루트            |
 | `--epochs`             | `train-model.py` | 최대 에폭 수              |
 | `--batch-size`         | `train-model.py` | 배치 크기                 |
 | `--lr`                 | `train-model.py` | 초기 학습률               |
@@ -155,7 +155,7 @@ uv run python scripts/train-model.py \
   --model resnet1d \
   --device cuda:2 \
   --dataset-dir data/dataset-v1 \
-  --output-dir data/models-v1 \
+  --models-dir data/models-v1 \
   --epochs 100
 ```
 
@@ -305,7 +305,7 @@ uv run python scripts/train-all-model.py --resume data/models/resnet1d/last.pt
 ```bash
 bin/train-all-model \
   --dataset-dir data/dataset-v1 \
-  --output-dir data/models-v1
+  --models-dir data/models-v1
 ```
 
 ### 먼저 배치만 확인
@@ -314,7 +314,7 @@ bin/train-all-model \
 bin/train-all-model \
   --dry-run \
   --dataset-dir data/dataset-v1 \
-  --output-dir data/models-v1
+  --models-dir data/models-v1
 ```
 
 ### 짧은 smoke run
@@ -322,7 +322,7 @@ bin/train-all-model \
 ```bash
 bin/train-all-model \
   --dataset-dir data/dataset-v1 \
-  --output-dir data/models-v1-smoke \
+  --models-dir data/models-v1-smoke \
   --epochs 1 \
   --batch-size 8
 ```
