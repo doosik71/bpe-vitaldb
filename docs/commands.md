@@ -30,19 +30,57 @@ bin/train-model --model ae_lstm
 bin/train-model --model bpnet_cf
 bin/train-model --model cnn_bilstm_at
 bin/train-model --model conv_reg
-bin/train-model --model conv_reg_at
 bin/train-model --model conv_reg_ds
 bin/train-model --model minception
 bin/train-model --model mtae
 bin/train-model --model mtae_tr
 bin/train-model --model naive
 bin/train-model --model pctn
+bin/train-model --model ppnet
 bin/train-model --model resnet1d
 bin/train-model --model resnet1d_micro
 bin/train-model --model resnet1d_mini
 bin/train-model --model resnet1d_tiny
 bin/train-model --model st_resnet
 bin/train-model --model xresnet1d
+
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model acfa
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model ae_lstm
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model bpnet_cf
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model cnn_bilstm_at
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model conv_reg
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model conv_reg_ds
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model minception
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model mtae
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model mtae_tr
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model naive
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model pctn
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model ppnet
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model resnet1d
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model resnet1d_micro
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model resnet1d_mini
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model resnet1d_tiny
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model st_resnet
+bin/train-model --dataset-dir data/dataset-v1 --models-dir data/models-v1 --model xresnet1d
+
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model acfa
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model ae_lstm
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model bpnet_cf
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model cnn_bilstm_at
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model conv_reg
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model conv_reg_ds
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model minception
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model mtae
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model mtae_tr
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model naive
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model pctn
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model ppnet
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model resnet1d
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model resnet1d_micro
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model resnet1d_mini
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model resnet1d_tiny
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model st_resnet
+bin/train-model --dataset-dir data/dataset-v2 --models-dir data/models-v2 --model xresnet1d
 
 bin/train-all-model
 bin/train-all-model --dataset-dir data/dataset-v1 --models-dir data/models-v1
@@ -54,7 +92,7 @@ bin/train-all-model --dataset-dir data/dataset-v2 --models-dir data/models-v2
 ```bash
 bin/print-model --model acfa              > data/models/acfa/struct.txt
 bin/print-model --model ae_lstm           > data/models/ae_lstm/struct.txt
-bin/print-model --model bpnet_cf           > data/models/bpnet_cf/struct.txt
+bin/print-model --model bpnet_cf          > data/models/bpnet_cf/struct.txt
 bin/print-model --model cnn_bilstm_at     > data/models/cnn_bilstm_at/struct.txt
 bin/print-model --model conv_reg          > data/models/conv_reg/struct.txt
 bin/print-model --model conv_reg_at       > data/models/conv_reg_at/struct.txt
@@ -64,6 +102,7 @@ bin/print-model --model mtae              > data/models/mtae/struct.txt
 bin/print-model --model mtae_tr           > data/models/mtae_tr/struct.txt
 bin/print-model --model naive             > data/models/naive/struct.txt
 bin/print-model --model pctn              > data/models/pctn/struct.txt
+bin/print-model --model ppnet             > data/models/ppnet/struct.txt
 bin/print-model --model resnet1d          > data/models/resnet1d/struct.txt
 bin/print-model --model resnet1d_micro    > data/models/resnet1d_micro/struct.txt
 bin/print-model --model resnet1d_mini     > data/models/resnet1d_mini/struct.txt
@@ -83,6 +122,7 @@ bin/print-model --model mtae              > data/models-v1/mtae/struct.txt
 bin/print-model --model mtae_tr           > data/models-v1/mtae_tr/struct.txt
 bin/print-model --model naive             > data/models-v1/naive/struct.txt
 bin/print-model --model pctn              > data/models-v1/pctn/struct.txt
+bin/print-model --model ppnet             > data/models-v1/ppnet/struct.txt
 bin/print-model --model resnet1d          > data/models-v1/resnet1d/struct.txt
 bin/print-model --model resnet1d_micro    > data/models-v1/resnet1d_micro/struct.txt
 bin/print-model --model resnet1d_mini     > data/models-v1/resnet1d_mini/struct.txt
@@ -102,6 +142,7 @@ bin/print-model --model mtae              > data/models-v2/mtae/struct.txt
 bin/print-model --model mtae_tr           > data/models-v2/mtae_tr/struct.txt
 bin/print-model --model naive             > data/models-v2/naive/struct.txt
 bin/print-model --model pctn              > data/models-v2/pctn/struct.txt
+bin/print-model --model ppnet             > data/models-v2/ppnet/struct.txt
 bin/print-model --model resnet1d          > data/models-v2/resnet1d/struct.txt
 bin/print-model --model resnet1d_micro    > data/models-v2/resnet1d_micro/struct.txt
 bin/print-model --model resnet1d_mini     > data/models-v2/resnet1d_mini/struct.txt
@@ -129,6 +170,7 @@ bin/generate-train-status  data/models/mtae
 bin/generate-train-status  data/models/mtae_tr
 bin/generate-train-status  data/models/naive
 bin/generate-train-status  data/models/pctn
+bin/generate-train-status  data/models/ppnet
 bin/generate-train-status  data/models/resnet1d
 bin/generate-train-status  data/models/resnet1d_micro
 bin/generate-train-status  data/models/resnet1d_mini
@@ -148,6 +190,7 @@ bin/generate-train-status  data/models-v1/mtae
 bin/generate-train-status  data/models-v1/mtae_tr
 bin/generate-train-status  data/models-v1/naive
 bin/generate-train-status  data/models-v1/pctn
+bin/generate-train-status  data/models-v1/ppnet
 bin/generate-train-status  data/models-v1/resnet1d
 bin/generate-train-status  data/models-v1/resnet1d_micro
 bin/generate-train-status  data/models-v1/resnet1d_mini
@@ -167,6 +210,7 @@ bin/generate-train-status  data/models-v2/mtae
 bin/generate-train-status  data/models-v2/mtae_tr
 bin/generate-train-status  data/models-v2/naive
 bin/generate-train-status  data/models-v2/pctn
+bin/generate-train-status  data/models-v2/ppnet
 bin/generate-train-status  data/models-v2/resnet1d
 bin/generate-train-status  data/models-v2/resnet1d_micro
 bin/generate-train-status  data/models-v2/resnet1d_mini
@@ -194,6 +238,7 @@ bin/eval-model data/models/mtae
 bin/eval-model data/models/mtae_tr
 bin/eval-model data/models/naive
 bin/eval-model data/models/pctn
+bin/eval-model data/models/ppnet
 bin/eval-model data/models/resnet1d
 bin/eval-model data/models/resnet1d_micro
 bin/eval-model data/models/resnet1d_mini
@@ -201,6 +246,47 @@ bin/eval-model data/models/resnet1d_tiny
 bin/eval-model data/models/st_resnet
 bin/eval-model data/models/xresnet1d
 
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/acfa
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/ae_lstm
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/bpnet_cf
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/cnn_bilstm_at
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/conv_reg
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/conv_reg_at
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/conv_reg_ds
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/minception
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/mtae
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/mtae_tr
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/naive
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/pctn
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/ppnet
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/resnet1d
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/resnet1d_micro
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/resnet1d_mini
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/resnet1d_tiny
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/st_resnet
+bin/eval-model --dataset-dir data/dataset-v1 data/models-v1/xresnet1d
+
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/acfa
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/ae_lstm
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/bpnet_cf
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/cnn_bilstm_at
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/conv_reg
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/conv_reg_at
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/conv_reg_ds
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/minception
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/mtae
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/mtae_tr
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/naive
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/pctn
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/ppnet
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/resnet1d
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/resnet1d_micro
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/resnet1d_mini
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/resnet1d_tiny
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/st_resnet
+bin/eval-model --dataset-dir data/dataset-v2 data/models-v2/xresnet1d
+
+bin/eval-all-model
 bin/eval-all-model --dataset-dir data/dataset-v1 --models-dir data/models-v1
 bin/eval-all-model --dataset-dir data/dataset-v2 --models-dir data/models-v2
 ```

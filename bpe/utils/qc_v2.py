@@ -377,7 +377,7 @@ def check_segment_quality(
 
         ABP와 PPG가 각각의 기준을 모두 통과해야 한다.
 
-    Rule 2 (OLD) - FASQA 스펙트럴 품질 검사 (ABP + PPG 각각)
+    Rule 2 (비활성화) - FASQA 스펙트럴 품질 검사 (ABP + PPG 각각)
         Frequency-domain Adaptive Signal Quality Assessment.
         FFT로 PSD를 계산하고 세 구간 비율로 신호 품질을 평가한다.
           psd_low  : HR 기본 주파수 이하 저주파 비율  → fasqa_psd_low_max(0.15) 미만이어야 함
