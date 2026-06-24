@@ -2,7 +2,7 @@
 # Serve the data/ folder over HTTP (multi-threaded, all interfaces).
 #
 # Usage:
-#   bin/share-data [port]
+#   bin/share-data --port [port]
 #
 #   port defaults to 8888.
 #   The LAN address is printed on startup so remote machines know where to connect.
@@ -12,4 +12,4 @@ set -euo pipefail
 SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
 cd "$SCRIPT_DIR/.."
 
-exec uv run python scripts/share-data.py ${1+--port "$1"} "${@:2}"
+exec uv run python scripts/share-data.py "$@"
