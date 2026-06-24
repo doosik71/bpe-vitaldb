@@ -110,7 +110,7 @@ GUI 스크립트는 `Launch` 버튼이 보이고,
 | Dataset          | Share Data           | `share-data.py`              | CLI  |
 | Model            | Print Model          | `print-model.py`             | CLI  |
 | Training         | Train Model          | `train-model.py`             | CLI  |
-| Training         | Training Status      | `train-status.py`            | CLI  |
+| Training         | Training Status      | `generate-train-status.py`            | CLI  |
 | Evaluation       | Eval Model           | `eval-model.py`              | CLI  |
 | Evaluation       | Eval PulseWoQ        | `eval-model-pulsewoq.py`     | CLI  |
 | Evaluation       | Browse BPE Results   | `bpe-browser.py`             | GUI  |
@@ -171,7 +171,7 @@ uv run python scripts/<target>.py [positionals...] [--flag value ...]
 예:
 
 ```bash
-uv run python scripts/train-model.py   --model resnet1d   --dataset-dir /abs/path/data/dataset   --output-dir /abs/path/data/models   --epochs 100
+uv run python scripts/train-model.py   --model resnet1d   --dataset-dir /abs/path/data/dataset   --models-dir /abs/path/data/models   --epochs 100
 ```
 
 명령 생성 규칙은 다음과 같다.

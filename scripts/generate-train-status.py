@@ -6,8 +6,8 @@ Reads metrics.csv from a run directory and writes two PNG graphs:
   mae_graph.png   - SBP/DBP MAE (train + val) per epoch
 
 Usage:
-    uv run python scripts/train-status.py <run_dir>
-    uv run python scripts/train-status.py data/models/resnet1d
+    uv run python scripts/generate-train-status.py <run_dir>
+    uv run python scripts/generate-train-status.py data/models/resnet1d
 """
 
 import argparse

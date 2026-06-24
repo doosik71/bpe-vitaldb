@@ -16,6 +16,7 @@ import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import argparse
+import csv
 import sys
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -90,8 +91,8 @@ _LABEL_VA = {
 # Row highlight tags: (foreground, background)
 TAG_COLORS = {
     "unknown": ("#777777", "#cccccc"),
-    "none":    ("#0000dd", "#cccccc"),
-    "ppg":     ("#dd0000", "#cccccc"),
+    "none":    ("#888800", "#cccccc"),
+    "ppg":     ("#880000", "#cccccc"),
     "abp":     ("#008800", "#cccccc"),
     "ppg_abp": ("#000000", "#ffffff"),
 }
@@ -118,13 +119,52 @@ def fetch_clinical_map(files: list[Path]) -> dict:
         return {}
 
 
-def scan_track_flags(path: Path) -> tuple[bool, bool]:
-    """Read only track headers needed for list coloring."""
+def load_track_cache(data_dir: Path) -> dict[int, tuple[int, int]]:
+    """Load data/vitaldb/index.csv → {caseid: (ppg_len, abp_len)}."""
+    cache: dict[int, tuple[int, int]] = {}
+    cache_path = data_dir / "index.csv"
+    if not cache_path.exists():
+        return cache
     try:
-        names = set(VitalFile(str(path), header_only=True).get_track_names())
-        return "SNUADC/PLETH" in names, "SNUADC/ART" in names
+        with cache_path.open(newline="") as f:
+            for row in csv.reader(f):
+                if len(row) >= 3:
+                    try:
+                        cache[int(row[0])] = (int(row[1]), int(row[2]))
+                    except ValueError:
+                        pass
     except Exception:
-        return False, False
+        pass
+    return cache
+
+
+def save_track_cache_entry(data_dir: Path, caseid: int, ppg_len: int, abp_len: int) -> None:
+    """Append one row to data/vitaldb/index.csv."""
+    try:
+        with (data_dir / "index.csv").open("a", newline="") as f:
+            csv.writer(f).writerow([caseid, ppg_len, abp_len])
+    except Exception:
+        pass
+
+
+def scan_track_info(path: Path) -> tuple[int, int]:
+    """Read track headers; return (ppg_len, abp_len) — 0 means absent."""
+    try:
+        vf = VitalFile(str(path), header_only=True)
+        names = set(vf.get_track_names())
+
+        def _nrecs(name: str) -> int:
+            if name not in names:
+                return 0
+            trk = vf.trks.get(name)
+            if trk is None:
+                return 0
+            n = len(trk.recs) if hasattr(trk, "recs") else 0
+            return n if n > 0 else 1
+
+        return _nrecs("SNUADC/PLETH"), _nrecs("SNUADC/ART")
+    except Exception:
+        return 0, 0
 
 
 def load_vital(path: Path) -> tuple[VitalFile, dict[str, np.ndarray]]:
@@ -183,6 +223,7 @@ class VitalDBBrowser:
         self.data_dir = data_dir
         self.files = files
         self.ci_map = ci_map
+        self._track_cache = load_track_cache(data_dir)
         self.track_flags: dict[int, tuple[bool, bool]] = {}
         self._row_by_path: dict[Path, dict] = {}
         self._filtered_rows: list[dict] = []
@@ -191,8 +232,13 @@ class VitalDBBrowser:
         self._track_scanned = np.zeros(max_cid + 1, dtype=bool)
         self._track_has_ppg = np.zeros(max_cid + 1, dtype=bool)
         self._track_has_abp = np.zeros(max_cid + 1, dtype=bool)
+        for cid, (ppg_len, abp_len) in self._track_cache.items():
+            if cid <= max_cid:
+                self._track_scanned[cid] = True
+                self._track_has_ppg[cid] = ppg_len > 0
+                self._track_has_abp[cid] = abp_len > 0
         self._scan_queue: LifoQueue[Path | None] = LifoQueue()
-        self._scan_results: Queue[tuple[int, Path, bool, bool]] = Queue()
+        self._scan_results: Queue[tuple[int, Path, int, int]] = Queue()
         self._scan_stop = threading.Event()
 
         # Waveform state
@@ -247,9 +293,15 @@ class VitalDBBrowser:
                 opname = ""
                 dur_s = ""
 
+            if cid < len(self._track_scanned) and self._track_scanned[cid]:
+                tag = self._tag_from_flags(
+                    bool(self._track_has_ppg[cid]), bool(self._track_has_abp[cid])
+                )
+            else:
+                tag = "unknown"
             row = dict(path=f, case=cid, duration=dur_s, dur_sec=dur,
                        age=age, sex=sex, size=f"{size_mb:.1f}MB",
-                       size_val=size_mb, opname=opname, tag="unknown")
+                       size_val=size_mb, opname=opname, tag=tag)
             rows.append(row)
             self._row_by_path[f] = row
         return rows
@@ -263,6 +315,17 @@ class VitalDBBrowser:
             f"{self.LIST_WIDTH + self.CANVAS_W + self.SEARCH_W}x{self.WIN_H}"
         )
         self.root.minsize(1180, 500)
+
+        # -- Top bar -----------------------------------------------------------
+        topbar = tk.Frame(self.root, bg="#d8d8e8", height=28)
+        topbar.pack(fill="x", side="top")
+        topbar.pack_propagate(False)
+        tk.Button(
+            topbar, text=" ? Help ", command=self._show_help,
+            bg="#c8c8dc", fg="#222233",
+            activebackground="#3366cc", activeforeground="white",
+            relief="flat", font=("Segoe UI", 9), padx=8, pady=2, cursor="hand2",
+        ).pack(side="right", padx=6, pady=3)
 
         content = tk.Frame(self.root, bg="#f0f0f7")
         content.pack(fill="both", expand=True)
@@ -321,13 +384,17 @@ class VitalDBBrowser:
         # Legend
         legend = tk.Frame(parent, bg="#f0f0f7")
         legend.pack(fill="x", padx=8, pady=(0, 4))
-        tk.Label(legend, text="o", bg="#f0f0f7", fg="#228844",
+        tk.Label(legend, text="o", bg=TAG_COLORS["abp"][1], fg=TAG_COLORS["abp"][0],
                  font=("Segoe UI", 9)).pack(side="left")
-        tk.Label(legend, text="No PPG  ", bg="#f0f0f7", fg="#888899",
+        tk.Label(legend, text="No PPG  ", bg=TAG_COLORS["abp"][1], fg=TAG_COLORS["abp"][0],
                  font=("Segoe UI", 9)).pack(side="left")
-        tk.Label(legend, text="#", bg="#fde8e8", fg="#cc2200",
+        tk.Label(legend, text="o", bg=TAG_COLORS["ppg"][1], fg=TAG_COLORS["ppg"][0],
                  font=("Segoe UI", 9)).pack(side="left")
-        tk.Label(legend, text="No ABP", bg="#f0f0f7", fg="#888899",
+        tk.Label(legend, text="No ABP  ", bg=TAG_COLORS["ppg"][1], fg=TAG_COLORS["ppg"][0],
+                 font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(legend, text="o", bg=TAG_COLORS["none"][1], fg=TAG_COLORS["none"][0],
+                 font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(legend, text="None", bg=TAG_COLORS["none"][1], fg=TAG_COLORS["none"][0],
                  font=("Segoe UI", 9)).pack(side="left")
 
         # Treeview
@@ -645,8 +712,8 @@ class VitalDBBrowser:
                 cid = int(path.stem) if path.stem.isdigit() else 0
                 if cid < len(self._track_scanned) and self._track_scanned[cid]:
                     continue
-                has_ppg, has_abp = scan_track_flags(path)
-                self._scan_results.put((cid, path, has_ppg, has_abp))
+                ppg_len, abp_len = scan_track_info(path)
+                self._scan_results.put((cid, path, ppg_len, abp_len))
 
         self._scan_thread = threading.Thread(
             target=worker, name="track-scan", daemon=True
@@ -657,7 +724,7 @@ class VitalDBBrowser:
         updated = False
         while True:
             try:
-                cid, path, has_ppg, has_abp = self._scan_results.get_nowait()
+                cid, path, ppg_len, abp_len = self._scan_results.get_nowait()
             except Empty:
                 break
 
@@ -665,10 +732,13 @@ class VitalDBBrowser:
             if row is None:
                 continue
 
+            has_ppg = ppg_len > 0
+            has_abp = abp_len > 0
             if cid < len(self._track_scanned):
                 self._track_scanned[cid] = True
                 self._track_has_ppg[cid] = has_ppg
                 self._track_has_abp[cid] = has_abp
+            save_track_cache_entry(self.data_dir, cid, ppg_len, abp_len)
             tag = self._tag_from_flags(has_ppg, has_abp)
             row["tag"] = tag
             self.track_flags[row["case"]] = (has_ppg, has_abp)
@@ -1104,6 +1174,190 @@ class VitalDBBrowser:
                   font=("Segoe UI", 9), padx=12, pady=3, cursor="hand2"
                   ).pack(side="right")
 
+    # -- Help dialog -----------------------------------------------------------
+
+    def _show_help(self):
+        from tkinter import font as tkfont
+        _available = set(tkfont.families(self.root))
+        _KO = next(
+            (f for f in ["Noto Sans CJK KR", "NanumGothic", "NanumSquare",
+                         "UnDotum", "Malgun Gothic", "AppleGothic", "Gulim"]
+             if f in _available),
+            None,
+        )
+        _use_ko = _KO is not None
+        _font = _KO if _use_ko else "TkDefaultFont"
+
+        if _use_ko:
+            _TITLE = "Dataset-v2 신호 품질 검사 규칙  (R1 ~ R9)"
+            _INTRO = (
+                "8초 세그먼트마다 아래 규칙을 순서대로 적용하며, "
+                "첫 번째 실패 규칙에서 즉시 기각합니다.\n"
+                "파형 화면의 색상 오버레이:  초록 = 통과,  빨강 = 기각 (Rn = 실패 규칙 번호)\n"
+            )
+            _RULES = [
+                ("R1", "반복값 / NaN 검사", False,
+                 "동일 값이 10 ticks (80 ms) 이상 연속되면 신호 동결(flatline)로 판정하여 기각.\n"
+                 "Inf / NaN을 포함하는 세그먼트도 이 단계에서 기각.\n"
+                 "통과 시 잔여 NaN은 선형 보간으로 대체.",
+                 "연속 동일값 임계: contlen = 10 samples (@ 125 Hz → 80 ms)"),
+                ("R2", "FASQA 스펙트럴 품질 검사", True,
+                 "ABP와 PPG 각각에 대해 FFT PSD를 계산하고 세 구간 에너지 비율로 품질을 평가.\n"
+                 "ABP와 PPG의 파형 특성이 다르므로 신호별 임계값을 분리하여 적용한다.\n"
+                 "  psd_low  : HR 기본 주파수 이하 저주파 비율  → PPG < 0.30,  ABP < 0.25\n"
+                 "  psd_tgt  : HR ±0.25 Hz 대역의 에너지 집중도  → PPG > 0.20,  ABP > 0.20\n"
+                 "  psd_high : 7 Hz 이상 고주파 비율             → PPG < 0.05,  ABP < 0.08\n"
+                 "ABP와 PPG가 각각의 기준을 모두 통과해야 한다.",
+                 "PPG: psd_low < 0.30  |  psd_tgt > 0.20  |  psd_high < 0.05\n"
+                 "  ABP: psd_low < 0.25  |  psd_tgt > 0.20  |  psd_high < 0.08"),
+                ("R3", "혈압 범위 검사", False,
+                 "BPF 미적용 원신호에서 ABP Peak → SBP, ABP Foot → DBP를 추출하여\n"
+                 "생리적으로 유효한 범위 내인지 확인. SBP ≤ DBP인 경우도 기각.",
+                 "SBP: 60 ~ 180 mmHg  |  DBP: 40 ~ 120 mmHg"),
+                ("R4", "심박수 범위 검사", False,
+                 "ABP와 PPG 각각에서 Peak 간격·Foot 간격으로 HR을 추정하고\n"
+                 "(peak HR + foot HR) / 2 의 평균값을 사용하여 범위를 검사.",
+                 "HR: 30 ~ 150 bpm"),
+                ("R5", "ABP-PPG 심박수 일치 검사", False,
+                 "R4에서 구한 HR_ABP와 HR_PPG의 차이가 임계값 이하이어야 함.\n"
+                 "두 신호의 HR이 크게 다르면 한쪽이 노이즈이거나 시간 동기화 오류로 판단.",
+                 "최대 HR 차이: hr_diff_max = 10 bpm"),
+                ("R6", "Peak / Foot 개수 차이 검사", False,
+                 "ABP 또는 PPG 각 신호 내에서 검출된 Peak 수와 Foot 수의 차이가\n"
+                 "임계값 이하이어야 함. 차이가 크면 피크/풋 알고리즘이 노이즈를 오검출한 것.",
+                 "최대 개수 차이: peak_foot_diff_max = 2"),
+                ("R7", "최소 Peak / Foot 개수 검사", False,
+                 "ABP에서 검출된 Peak와 Foot 각각의 수가 최솟값 이상이어야 함.\n"
+                 "8초 세그먼트에서 HR 30 bpm 이상이면 최소 4박자가 포함되어야 한다.",
+                 "최소 Peak / Foot 수: min_peaks = 4"),
+                ("R8", "세그먼트 내 혈압 변동 범위 검사", False,
+                 "원신호 기준 Peak값(SBP)의 최대-최소 범위와\n"
+                 "Foot값(DBP)의 최대-최소 범위가 각각 임계값 이하이어야 함.\n"
+                 "범위가 너무 넓으면 혈압 급변이거나 이상치 피크가 포함된 것.",
+                 "SBP range ≤ 40 mmHg  |  DBP range ≤ 20 mmHg"),
+                ("R9", "PPG 파형 스큐니스 검사", False,
+                 "Foot-to-Foot으로 분할한 각 PPG 박동의 왜도(skewness) 평균이 양수이어야 함.\n"
+                 "정상 PPG는 급격히 상승 후 완만히 하강하므로 양의 왜도를 가진다.\n"
+                 "왜도 ≤ 0이면 파형이 뒤집히거나 노이즈가 심한 것으로 판단.",
+                 "avg skewness > 0"),
+            ]
+            _disabled_suffix = "  (비활성)"
+        else:
+            _TITLE = "Dataset-v2 Signal Quality Rules  (R1 ~ R9)"
+            _INTRO = (
+                "Rules are applied in order to every 8-second segment. "
+                "A segment is rejected at the first failing rule.\n"
+                "Waveform overlay:  green = pass,  red = reject (Rn = failing rule number)\n"
+            )
+            _RULES = [
+                ("R1", "Repetition / NaN Check", False,
+                 "Reject if any value repeats for >= 10 ticks (80 ms) — flatline detection.\n"
+                 "Segments containing Inf or NaN are also rejected here.\n"
+                 "Remaining NaNs are replaced by linear interpolation if the segment passes.",
+                 "max consecutive identical samples: contlen = 10 (@ 125 Hz = 80 ms)"),
+                ("R2", "FASQA Spectral Quality Check", True,
+                 "Compute FFT PSD for ABP and PPG separately; evaluate three band ratios.\n"
+                 "Separate thresholds are applied per signal to account for different waveform shapes.\n"
+                 "  psd_low  : sub-HR low-freq ratio        PPG < 0.30,  ABP < 0.25\n"
+                 "  psd_tgt  : energy in HR ±0.25 Hz band   PPG > 0.20,  ABP > 0.20\n"
+                 "  psd_high : ratio above 7 Hz             PPG < 0.05,  ABP < 0.08\n"
+                 "Both signals must pass their respective thresholds.",
+                 "PPG: psd_low < 0.30  |  psd_tgt > 0.20  |  psd_high < 0.05\n"
+                 "  ABP: psd_low < 0.25  |  psd_tgt > 0.20  |  psd_high < 0.08"),
+                ("R3", "Blood Pressure Range Check", False,
+                 "Extract avg SBP (ABP peaks) and avg DBP (ABP foots) from the raw signal.\n"
+                 "Reject if outside physiological range or if SBP <= DBP.",
+                 "SBP: 60 ~ 180 mmHg  |  DBP: 40 ~ 120 mmHg"),
+                ("R4", "Heart Rate Range Check", False,
+                 "Estimate HR from peak intervals and foot intervals for both ABP and PPG.\n"
+                 "Use (peak HR + foot HR) / 2 as the representative HR for each signal.",
+                 "HR: 30 ~ 150 bpm"),
+                ("R5", "ABP-PPG Heart Rate Consistency", False,
+                 "Reject if |HR_ABP - HR_PPG| exceeds the threshold.\n"
+                 "A large difference indicates noise in one signal or a sync error.",
+                 "max HR difference: hr_diff_max = 10 bpm"),
+                ("R6", "Peak / Foot Count Difference", False,
+                 "Reject if |peak_count - foot_count| in ABP or PPG exceeds the threshold.\n"
+                 "A large difference implies spurious detections caused by noise.",
+                 "max count difference: peak_foot_diff_max = 2"),
+                ("R7", "Minimum Peak / Foot Count", False,
+                 "Reject if the number of detected peaks or foots in ABP is below the minimum.\n"
+                 "An 8-second segment at HR >= 30 bpm should contain at least 4 beats.",
+                 "min peaks / foots: min_peaks = 4"),
+                ("R8", "Intra-segment BP Variability", False,
+                 "Reject if the range (max - min) of SBP peaks or DBP foots in the raw signal\n"
+                 "exceeds the threshold. A large range implies sudden BP swings or outlier peaks.",
+                 "SBP range <= 40 mmHg  |  DBP range <= 20 mmHg"),
+                ("R9", "PPG Waveform Skewness", False,
+                 "Reject if the mean skewness of per-beat PPG cycles (foot-to-foot) is <= 0.\n"
+                 "Physiological PPG rises sharply then decays slowly, giving positive skewness.\n"
+                 "Skewness <= 0 indicates an inverted or severely noisy waveform.",
+                 "avg skewness > 0"),
+            ]
+            _disabled_suffix = "  (disabled)"
+
+        win = tk.Toplevel(self.root)
+        win.title("QC Rules — R1 ~ R9")
+        win.configure(bg="#f0f0f7")
+        win.geometry("800x800")
+        win.resizable(True, True)
+
+        frame = tk.Frame(win, bg="#f0f0f7")
+        frame.pack(fill="both", expand=True, padx=12, pady=(10, 4))
+
+        txt = tk.Text(
+            frame,
+            bg="#ffffff", fg="#222233",
+            font=(_font, 11),
+            relief="flat", wrap="word",
+            cursor="arrow", padx=11, pady=8,
+        )
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=txt.yview)
+        txt.configure(yscrollcommand=vsb.set)
+        txt.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+
+        txt.tag_configure("title",
+                          font=(_font, 13, "bold"), foreground="#1133cc",
+                          spacing3=6)
+        txt.tag_configure("intro",
+                          font=(_font, 11), foreground="#444455",
+                          spacing3=10)
+        txt.tag_configure("rule",
+                          font=(_font, 12, "bold"), foreground="#222233",
+                          spacing1=8, spacing3=2)
+        txt.tag_configure("body",
+                          font=(_font, 11), foreground="#333344",
+                          lmargin1=16, lmargin2=16, spacing3=2)
+        txt.tag_configure("param",
+                          font=("Consolas", 10), foreground="#004499",
+                          background="#eef2ff",
+                          lmargin1=16, lmargin2=16, spacing3=8)
+        txt.tag_configure("disabled",
+                          font=("Consolas", 10, "italic"), foreground="#999999",
+                          background="#eef2ff",
+                          lmargin1=16, lmargin2=16, spacing3=8)
+
+        txt.insert("end", f"{_TITLE}\n", "title")
+        txt.insert("end", _INTRO, "intro")
+
+        for tag, title, disabled, desc, params in _RULES:
+            suffix = _disabled_suffix if disabled else ""
+            txt.insert("end", f"[{tag}]  {title}{suffix}\n", "rule")
+            txt.insert("end", f"{desc}\n", "body")
+            txt.insert("end", f"  > {params}\n", "disabled" if disabled else "param")
+
+        txt.configure(state="disabled")
+
+        bot = tk.Frame(win, bg="#f0f0f7")
+        bot.pack(fill="x", padx=12, pady=(0, 10))
+        tk.Button(
+            bot, text="Close", command=win.destroy,
+            bg="#d0d8f0", fg="#222233",
+            activebackground="#3366cc", activeforeground="white",
+            relief="flat", font=("TkDefaultFont", 9), padx=14, pady=3, cursor="hand2",
+        ).pack(side="right")
+
     # -- Dataset-v2 QC --------------------------------------------------------
 
     def _qc_window_results(self) -> list[QCResult]:
@@ -1176,7 +1430,7 @@ class VitalDBBrowser:
             else:
                 lx = max(ts, self._t0)
                 ha = "left"
-            lbl = "✓" if qr.passed else f"R{qr.failed_rule}"
+            lbl = "OK" if qr.passed else f"R{qr.failed_rule}"
             ax.text(lx, 0.5, lbl,
                     transform=ax.get_xaxis_transform(),
                     ha=ha, va="center",

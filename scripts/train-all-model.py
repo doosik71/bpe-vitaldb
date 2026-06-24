@@ -15,7 +15,7 @@ Usage:
     uv run python scripts/train-all-model.py [TRAIN-MODEL OPTIONS...]
 
 Examples:
-    uv run python scripts/train-all-model.py --dataset-dir data/dataset-v1 --output-dir data/models-v1
+    uv run python scripts/train-all-model.py --dataset-dir data/dataset-v1 --models-dir data/models-v1
     uv run python scripts/train-all-model.py --epochs 150 --batch-size 128 --workers 2
 """
 
@@ -174,7 +174,7 @@ def main() -> None:
         log.error("No models are registered in bpe.models.list_models().")
         sys.exit(1)
 
-    output_dir = extract_option_path(forward_args, "--output-dir", DEFAULT_OUTPUT_DIR)
+    output_dir = extract_option_path(forward_args, "--models-dir", DEFAULT_OUTPUT_DIR)
     devices = detect_devices()
     max_parallel = len(devices)
 

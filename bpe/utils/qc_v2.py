@@ -6,12 +6,12 @@ Extracted from scripts/construct-dataset-v2.py so that other tools
 
 Public API
 ----------
-QCParams          — threshold parameters (mirrors construct-dataset-v2 CLI defaults)
-QCResult          — per-segment quality result with rule-level detail
+QCParams          - threshold parameters (mirrors construct-dataset-v2 CLI defaults)
+QCResult          - per-segment quality result with rule-level detail
 check_segment_quality(ppg_seg, abp_seg, abp_raw_seg, fs, t_start, params)
-    → QCResult    — evaluate one 8-second segment
+    → QCResult    - evaluate one 8-second segment
 compute_case_qc(ppg_raw, abp_raw, ...)
-    → list[QCResult]  — evaluate all sliding windows in a full case
+    → list[QCResult]  - evaluate all sliding windows in a full case
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from scipy.signal import butter, find_peaks, sosfiltfilt
 from scipy.stats import skew
 
 # ---------------------------------------------------------------------------
-# Constants — must match construct-dataset-v2.py
+# Constants - must match construct-dataset-v2.py
 # ---------------------------------------------------------------------------
 
 SOURCE_HZ = 500
@@ -51,7 +51,7 @@ SENTINEL_NAN = -9999.0
 
 @dataclass
 class QCParams:
-    """Threshold parameters — defaults match construct-dataset-v2.py CLI."""
+    """Threshold parameters - defaults match construct-dataset-v2.py CLI."""
     contlen: int = 10
     sbp_min: float = 60.0
     sbp_max: float = 180.0
@@ -67,6 +67,12 @@ class QCParams:
     fasqa_psd_low_max: float = 0.15
     fasqa_psd_tgt_min: float = 0.10
     fasqa_psd_high_max: float = 0.05
+    fasqa_ppg_psd_low_max: float = 0.30
+    fasqa_ppg_psd_tgt_min: float = 0.20
+    fasqa_ppg_psd_high_max: float = 0.05
+    fasqa_abp_psd_low_max: float = 0.25
+    fasqa_abp_psd_tgt_min: float = 0.20
+    fasqa_abp_psd_high_max: float = 0.08
 
 
 @dataclass
@@ -74,7 +80,7 @@ class QCResult:
     """Quality-control result for a single 8-second segment."""
     t_start: float                        # segment start (seconds within case)
     passed: bool
-    failed_rule: int | None               # first failing rule 1–9, None = passed
+    failed_rule: int | None               # first failing rule 1-9, None = passed
     # per-rule result (None = not reached)
     rules: dict[int, bool | None]
     metrics: dict[str, float] = field(default_factory=dict)
@@ -83,7 +89,7 @@ class QCResult:
 
 
 # ---------------------------------------------------------------------------
-# Signal processing helpers — verbatim from construct-dataset-v2.py
+# Signal processing helpers - verbatim from construct-dataset-v2.py
 # ---------------------------------------------------------------------------
 
 def _bandpass_filter(
@@ -335,7 +341,7 @@ def check_segment_quality(
     ----------
     ppg_seg     : BPF-filtered PPG (target_hz samples)
     abp_seg     : BPF-filtered ABP (target_hz samples)
-    abp_raw_seg : decimated raw ABP without BPF — for mmHg label extraction
+    abp_raw_seg : decimated raw ABP without BPF - for mmHg label extraction
     fs          : sample rate of all three arrays (target_hz)
     t_start     : segment start time within the case (seconds)
     params      : QCParams; None → use defaults
@@ -346,12 +352,32 @@ def check_segment_quality(
 
     Rules
     -----
-    Rule 1 — 반복값 / NaN 검사
-        동일 값이 contlen(기본 10) 샘플 이상 연속되면 신호 동결(flatline)로 판정.
+    Rule 1 - 반복값 / NaN 검사
+        동일 값이 contlen(기본 10 ticks, 80ms) 샘플 이상 연속되면 신호 동결(flatline)로 판정.
         Inf / NaN을 포함하는 세그먼트도 이 단계에서 기각.
         통과 시 잔여 NaN은 선형 보간으로 대체.
 
-    Rule 2 — FASQA 스펙트럴 품질 검사 (ABP + PPG 각각)
+    Rule 2 (NEW) - FASQA 스펙트럴 품질 검사 (ABP + PPG 각각)
+        Frequency-domain Adaptive Signal Quality Assessment.
+        FFT로 PSD를 계산하고 세 구간 비율로 신호 품질을 평가한다.
+        단, ABP와 PPG의 파형 특성이 다르므로 동일 임계값을 적용하지 않고
+        신호별 임계값을 분리하여 적용한다.
+
+        psd_low  : HR 기본 주파수 이하 저주파 비율
+            → PPG는 fasqa_ppg_psd_low_max(0.30) 미만이어야 함
+            → ABP는 fasqa_abp_psd_low_max(0.25) 미만이어야 함
+
+        psd_tgt  : HR ±0.25 Hz 대역의 집중도
+            → PPG는 fasqa_ppg_psd_tgt_min(0.20) 초과해야 함
+            → ABP는 fasqa_abp_psd_tgt_min(0.20) 초과해야 함
+
+        psd_high : 7 Hz 이상 고주파 비율
+            → PPG는 fasqa_ppg_psd_high_max(0.05) 미만이어야 함
+            → ABP는 fasqa_abp_psd_high_max(0.08) 미만이어야 함
+
+        ABP와 PPG가 각각의 기준을 모두 통과해야 한다.
+
+    Rule 2 (비활성화) - FASQA 스펙트럴 품질 검사 (ABP + PPG 각각)
         Frequency-domain Adaptive Signal Quality Assessment.
         FFT로 PSD를 계산하고 세 구간 비율로 신호 품질을 평가한다.
           psd_low  : HR 기본 주파수 이하 저주파 비율  → fasqa_psd_low_max(0.15) 미만이어야 함
@@ -359,39 +385,39 @@ def check_segment_quality(
           psd_high : 7 Hz 이상 고주파 비율            → fasqa_psd_high_max(0.05) 미만이어야 함
         ABP와 PPG 모두 통과해야 한다. PPG는 min-max 정규화 후 적용.
 
-    Rule 3 — 혈압 범위 검사
+    Rule 3 - 혈압 범위 검사
         abp_raw_seg(BPF 미적용 원신호)에서 추출한 평균 SBP / DBP가
         정의된 생리적 범위 안에 있어야 한다.
           SBP: sbp_min(60) ~ sbp_max(180) mmHg
           DBP: dbp_min(40) ~ dbp_max(120) mmHg
         SBP ≤ DBP인 생리적으로 불가능한 경우도 이 룰로 기각.
 
-    Rule 4 — 심박수 범위 검사
+    Rule 4 - 심박수 범위 검사
         ABP와 PPG 각각에서 Peak 간격, Foot 간격으로 HR을 추정하고
         (peak HR + foot HR) / 2 의 평균을 사용한다.
           hr_min(30) ~ hr_max(150) bpm 범위를 벗어나면 기각.
 
-    Rule 5 — ABP–PPG 심박수 일치 검사
+    Rule 5 - ABP-PPG 심박수 일치 검사
         Rule 4에서 구한 HR_ABP와 HR_PPG의 차이가
         hr_diff_max(10) bpm 이내이어야 한다.
         두 신호의 심박수가 크게 다르면 한쪽 신호가 노이즈이거나
         신호 간 시간 동기화 오류일 가능성이 높다.
 
-    Rule 6 — Peak / Foot 개수 차이 검사
+    Rule 6 - Peak / Foot 개수 차이 검사
         ABP 또는 PPG 신호 내에서 검출된 Peak 수와 Foot 수의 차이가
         peak_foot_diff_max(2) 이하이어야 한다.
         차이가 크면 피크/풋 검출 알고리즘이 노이즈를 오검출한 것으로 판단.
 
-    Rule 7 — 최소 Peak / Foot 개수 검사
+    Rule 7 - 최소 Peak / Foot 개수 검사
         ABP에서 검출된 Peak와 Foot 각각의 수가 min_peaks(4) 이상이어야 한다.
         8초 세그먼트에서 심박수 30 bpm 이상이면 최소 4박자가 포함되어야 한다.
 
-    Rule 8 — 세그먼트 내 혈압 변동 범위 검사
+    Rule 8 - 세그먼트 내 혈압 변동 범위 검사
         abp_raw_seg 기준으로 Peak값(SBP)과 Foot값(DBP)의 최대-최소 범위가
         각각 sbp_range_max(40) mmHg, dbp_range_max(20) mmHg 이하이어야 한다.
         범위가 너무 넓으면 혈압 변동이 심하거나 이상치 피크가 포함된 것.
 
-    Rule 9 — PPG 파형 스큐니스 검사
+    Rule 9 - PPG 파형 스큐니스 검사
         Foot-to-Foot으로 분할한 각 PPG 박동의 왜도(skewness) 평균이
         양수(> 0)이어야 한다.
         생리적으로 정상 PPG는 급격히 상승 후 완만히 하강하므로 양의 왜도를 가진다.
@@ -421,35 +447,35 @@ def check_segment_quality(
     abp_seg = _nan_linear_interp(abp_seg)
     ppg_seg = _nan_linear_interp(ppg_seg)
 
-    # Peak / foot detection (reused by rules 2–9)
+    # Peak / foot detection (reused by rules 2-9)
     abp_peaks, abp_foots = _find_abp_peak_foots(abp_seg, fs)
     ppg_peaks, ppg_foots = _find_ppg_peak_foots(ppg_seg, fs)
 
-    # Rule 2: FASQA — ABP
-    abp_ok, (psd_lo_a, psd_tg_a, psd_hi_a, _) = _fasqa_adaptive(
-        abp_seg, fs, abp_peaks, abp_foots,
-        psd_low_max=params.fasqa_psd_low_max,
-        psd_tgt_min=params.fasqa_psd_tgt_min,
-        psd_high_max=params.fasqa_psd_high_max,
-    )
-    metrics.update(abp_psd_low=psd_lo_a, abp_psd_tgt=psd_tg_a,
-                   abp_psd_high=psd_hi_a)
+    # # Rule 2: FASQA - ABP
+    # abp_ok, (psd_lo_a, psd_tg_a, psd_hi_a, _) = _fasqa_adaptive(
+    #     abp_seg, fs, abp_peaks, abp_foots,
+    #     psd_low_max=params.fasqa_abp_psd_low_max,
+    #     psd_tgt_min=params.fasqa_abp_psd_tgt_min,
+    #     psd_high_max=params.fasqa_abp_psd_high_max,
+    # )
+    # metrics.update(abp_psd_low=psd_lo_a, abp_psd_tgt=psd_tg_a,
+    #                abp_psd_high=psd_hi_a)
 
-    # Rule 2: FASQA — PPG (min-max normalised)
-    ppg_ok, (psd_lo_p, psd_tg_p, psd_hi_p, _) = _fasqa_adaptive(
-        _minmax_scale(ppg_seg), fs, ppg_peaks, ppg_foots,
-        psd_low_max=params.fasqa_psd_low_max,
-        psd_tgt_min=params.fasqa_psd_tgt_min,
-        psd_high_max=params.fasqa_psd_high_max,
-    )
-    metrics.update(ppg_psd_low=psd_lo_p, ppg_psd_tgt=psd_tg_p,
-                   ppg_psd_high=psd_hi_p)
+    # # Rule 2: FASQA - PPG (min-max normalised)
+    # ppg_ok, (psd_lo_p, psd_tg_p, psd_hi_p, _) = _fasqa_adaptive(
+    #     _minmax_scale(ppg_seg), fs, ppg_peaks, ppg_foots,
+    #     psd_low_max=params.fasqa_ppg_psd_low_max,
+    #     psd_tgt_min=params.fasqa_ppg_psd_tgt_min,
+    #     psd_high_max=params.fasqa_ppg_psd_high_max,
+    # )
+    # metrics.update(ppg_psd_low=psd_lo_p, ppg_psd_tgt=psd_tg_p,
+    #                ppg_psd_high=psd_hi_p)
 
-    if not abp_ok or not ppg_ok:
-        return _fail(2)
-    rules[2] = True
+    # if not abp_ok or not ppg_ok:
+    #     return _fail(2)
+    # rules[2] = True
 
-    # Labels — needed by Rules 3 and 8 (raw signal → absolute mmHg)
+    # Labels - needed by Rules 3 and 8 (raw signal → absolute mmHg)
     if abp_peaks.size == 0 or abp_foots.size == 0:
         return _fail(3)
     avg_sbp = float(np.mean(abp_raw_seg[abp_peaks]))
@@ -460,7 +486,7 @@ def check_segment_quality(
     if not (params.sbp_min <= avg_sbp <= params.sbp_max
             and params.dbp_min <= avg_dbp <= params.dbp_max):
         return _fail(3)
-    # Basic physiological sanity (SBP > DBP) — classify under Rule 3
+    # Basic physiological sanity (SBP > DBP) - classify under Rule 3
     if avg_sbp <= avg_dbp:
         return _fail(3)
     rules[3] = True
@@ -476,7 +502,7 @@ def check_segment_quality(
         return _fail(4)
     rules[4] = True
 
-    # Rule 5: ABP–PPG heart rate consistency
+    # Rule 5: ABP-PPG heart rate consistency
     hr_diff = abs(hr_abp - hr_ppg)
     metrics["hr_diff"] = hr_diff
     if hr_diff > params.hr_diff_max:

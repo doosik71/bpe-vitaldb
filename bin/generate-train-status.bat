@@ -6,9 +6,9 @@ rem   loss_graph.png  -- train_loss vs val_loss per epoch
 rem   mae_graph.png   -- SBP/DBP MAE (train + val) per epoch
 rem
 rem Usage:
-rem   bin\train-status.bat <run_dir>
-rem   bin\train-status.bat data\models\resnet1d
-rem   bin\train-status.bat data\models\resnet1d --no-save
+rem   bin\generate-train-status.bat <run_dir>
+rem   bin\generate-train-status.bat data\models\resnet1d
+rem   bin\generate-train-status.bat data\models\resnet1d --no-save
 
 cd /d "%~dp0.."
-uv run python scripts\train-status.py %*
+uv run python scripts\generate-train-status.py %*

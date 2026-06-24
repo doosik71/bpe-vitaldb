@@ -13,7 +13,7 @@ It reuses the already-built NPZ dataset to avoid repeating VitalDB parsing,
 resampling, segmentation, and label generation.
 
 Output layout:
-    <output-dir>/
+    <dataset-dir>/
         train/  <caseid>.npz
         val/    <caseid>.npz
         test/   <caseid>.npz
@@ -27,7 +27,7 @@ Usage:
 
 Options:
     --input-dir         Root input dataset directory     (default: data/dataset)
-    --output-dir        Root output dataset directory    (default: data/dataset-v1)
+    --dataset-dir       Root output dataset directory    (default: data/dataset-v1)
     --target-hz         PPG sample rate in Hz            (default: 125)
     --nperseg           Welch segment length             (default: 256)
     --power-ratio-min   Minimum allowed power_ratio      (default: 0.6)
@@ -67,7 +67,7 @@ def parse_args() -> argparse.Namespace:
         help="Root input dataset directory (default: data/dataset)",
     )
     p.add_argument(
-        "--output-dir",
+        "--dataset-dir",
         type=Path,
         default=Path("data/dataset-v1"),
         help="Root output dataset directory (default: data/dataset-v1)",
@@ -278,16 +278,16 @@ def main() -> None:
 
     for split_name, files in splits.items():
         log.info("  %-5s : %d cases", split_name, len(files))
-        (args.output_dir / split_name).mkdir(parents=True, exist_ok=True)
+        (args.dataset_dir / split_name).mkdir(parents=True, exist_ok=True)
 
     all_tasks: list[tuple[Path, Path, str]] = [
-        (path, args.output_dir / split_name, split_name)
+        (path, args.dataset_dir / split_name, split_name)
         for split_name, files in splits.items()
         for path in files
     ]
 
     csv_paths: dict[str, Path] = {
-        split_name: args.output_dir / split_name / INDEX_FILE
+        split_name: args.dataset_dir / split_name / INDEX_FILE
         for split_name in SPLITS
     }
 
@@ -304,7 +304,7 @@ def main() -> None:
         for split_name, csv_path in csv_paths.items():
             if not csv_path.exists():
                 index: dict[str, int] = {}
-                existing_npzs = sorted((args.output_dir / split_name).glob("*.npz"))
+                existing_npzs = sorted((args.dataset_dir / split_name).glob("*.npz"))
                 if existing_npzs:
                     log.info(
                         "  %-5s : building index.csv from %d existing NPZ files ...",
@@ -412,7 +412,7 @@ def main() -> None:
         log.info("  %-5s   %12s   %12s   %5.1f%%", name, f"{new_segs:,}", f"{total_segs:,}", pct)
     log.info("  " + "-" * 42)
     log.info("  %-5s   %12s   %12s   %5.1f%%", "total", f"{total_new:,}", f"{total_all:,}", 100.0)
-    log.info("Output written to %s", args.output_dir.resolve())
+    log.info("Output written to %s", args.dataset_dir.resolve())
 
 
 if __name__ == "__main__":

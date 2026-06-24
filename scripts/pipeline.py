@@ -236,10 +236,10 @@ PIPELINE = [
         ],
     },
     {
-        "id": "train_status",
+        "id": "generate_train_status",
         "label": "Training Status",
         "category": "Training",
-        "script": "train-status.py",
+        "script": "generate-train-status.py",
         "desc": "Plot loss and MAE curves from a completed or in-progress training run.",
         "gui": False,
         "params": [

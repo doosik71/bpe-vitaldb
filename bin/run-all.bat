@@ -8,7 +8,7 @@ rem   3  Build train / val / test NPZ dataset (--skip-build   to bypass)
 rem
 rem Per-model loop (repeated for every model in the list):
 rem   4  Train the model
-rem   5  Plot training curves (train-status)  (non-critical)
+rem   5  Plot training curves (generate-train-status)  (non-critical)
 rem   6  Evaluate model on the test set
 rem      (pulsewoq_resnet1d uses eval-model-pulsewoq.py automatically)
 rem
@@ -120,9 +120,9 @@ if "%SKIP_DOWNLOAD%"=="1" (
     echo   [SKIP] --skip-download specified.
 ) else (
     if "%MAX_CASES%"=="" (
-        uv run python scripts\download-vitaldb.py --output-dir "%DATA_DIR%" --filter-tracks
+        uv run python scripts\download-vitaldb.py --vitaldb-dir "%DATA_DIR%" --filter-tracks
     ) else (
-        uv run python scripts\download-vitaldb.py --output-dir "%DATA_DIR%" --filter-tracks --max-cases %MAX_CASES%
+        uv run python scripts\download-vitaldb.py --vitaldb-dir "%DATA_DIR%" --filter-tracks --max-cases %MAX_CASES%
     )
     if errorlevel 1 (
         echo [FAIL] download-vitaldb.py failed.
@@ -134,7 +134,7 @@ call :step_header "Build Dataset"
 if "%SKIP_BUILD%"=="1" (
     echo   [SKIP] --skip-build specified.
 ) else (
-    uv run python scripts\construct-dataset.py --data-dir "%DATA_DIR%" --output-dir "%DATASET_DIR%"
+    uv run python scripts\construct-dataset.py --data-dir "%DATA_DIR%" --dataset-dir "%DATASET_DIR%"
     if errorlevel 1 (
         echo [FAIL] construct-dataset.py failed.
         exit /b 1
@@ -159,7 +159,7 @@ for %%m in (%MODEL_LIST%) do (
     uv run python scripts\train-model.py ^
         --model       %%m ^
         --dataset-dir "%DATASET_DIR%" ^
-        --output-dir  "%MODELS_DIR%" ^
+        --models-dir  "%MODELS_DIR%" ^
         --epochs      %EPOCHS% ^
         --batch-size  %BATCH_SIZE% ^
         --device      %DEVICE% ^
@@ -172,8 +172,8 @@ for %%m in (%MODEL_LIST%) do (
 
     if "!MODEL_FAILED!"=="0" (
         call :step_header "Training Status: %%m"
-        uv run python scripts\train-status.py "%MODELS_DIR%\%%m"
-        if errorlevel 1 echo [WARN] train-status.py failed for %%m -- continuing.
+        uv run python scripts\generate-train-status.py "%MODELS_DIR%\%%m"
+        if errorlevel 1 echo [WARN] generate-train-status.py failed for %%m -- continuing.
 
         call :step_header "Evaluate: %%m"
         if /i "%%m"=="pulsewoq_resnet1d" (

@@ -7,7 +7,7 @@ Usage:
     uv run python scripts/download-vitaldb.py [OPTIONS]
 
 Options:
-    --output-dir    Destination directory (default: data/vitaldb)
+    --vitaldb-dir   Destination directory (default: data/vitaldb)
     --max-cases     Maximum number of cases to download (default: all)
     --start-case    First case ID to download (default: 1)
     --end-case      Last case ID to download (default: 6388)
@@ -56,7 +56,7 @@ def parse_args():
         epilog=__doc__,
     )
     parser.add_argument(
-        "--output-dir",
+        "--vitaldb-dir",
         type=Path,
         default=Path("data/vitaldb"),
         help="Destination directory (default: data/vitaldb)",
@@ -151,7 +151,7 @@ def download_vital_file(caseid: int, output_dir: Path, resume: bool) -> tuple[in
 def main():
     args = parse_args()
 
-    output_dir: Path = args.output_dir
+    output_dir: Path = args.vitaldb_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     log.info(f"Output directory : {output_dir.resolve()}")

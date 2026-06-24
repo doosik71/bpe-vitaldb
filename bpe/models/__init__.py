@@ -5,13 +5,13 @@ from bpe.models.ae_lstm import AE_LSTM
 from bpe.models.bpnet_cf import BPNetCF
 from bpe.models.cnn_bilstm_at import CNNBiLSTMAttention
 from bpe.models.conv_reg import ConvReg
-from bpe.models.conv_reg_at import ConvRegAt
 from bpe.models.conv_reg_ds import ConvRegDs
 from bpe.models.minception import MInception
 from bpe.models.mtae import MTAE
 from bpe.models.mtae_tr import MTAE_TR
 from bpe.models.naive import NaiveConstant
 from bpe.models.pctn import PCTN
+from bpe.models.ppnet import PPNet
 from bpe.models.resnet1d import ResNet1D
 from bpe.models.resnet1d_micro import ResNet1DMicro
 from bpe.models.resnet1d_mini import ResNet1DMini
@@ -26,6 +26,7 @@ from bpe.models.registry import (
     register_model,
 )
 
+# from bpe.models.conv_reg_at import ConvRegAt
 # from bpe.models.conv_reg_nas import ConvRegNas
 # from bpe.models.pulse_resnet1d import PulseResNet1D
 # from bpe.models.pulsew_resnet1d import PulseWResNet1D
@@ -38,7 +39,7 @@ __all__ = [
     "BPNetCF",
     "CNNBiLSTMAttention",
     "ConvReg",
-    "ConvRegAt",
+    # "ConvRegAt",
     "ConvRegDs",
     # "ConvRegNas",
     "MInception",
@@ -46,6 +47,7 @@ __all__ = [
     "MTAE_TR",
     "NaiveConstant",
     "PCTN",
+    "PPNet",
     # "PulseResNet1D",
     # "PulseWResNet1D",
     # "PulseWOResNet1D",

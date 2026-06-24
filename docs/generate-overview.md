@@ -107,14 +107,14 @@ Trainable params: 1,234,567
 3. `struct.txt`에서 parameter count 파싱
 4. `eval_results.json`에서 SBP/DBP metric 및 inference time 로드
 5. 로드된 레코드 목록으로 그래프 생성
-6. `output_dir`에 파일 저장
+6. `results_dir`에 파일 저장
 
 핵심 함수 역할은 아래와 같다.
 
 ### 4.1 데이터 로딩
 
 - `parse_args()`
-  - `--models-dir`, `--output-dir`, `--format` 파싱
+  - `--models-dir`, `--results-dir`, `--format` 파싱
 - `_parse_param_count(struct_path)`
   - `struct.txt`에서 trainable parameter count 추출
 - `load_model_data(models_dir)`
@@ -250,7 +250,7 @@ uv run python scripts/generate-overview.py --models-dir data/models
 출력 디렉터리 변경:
 
 ```bash
-uv run python scripts/generate-overview.py --output-dir images
+uv run python scripts/generate-overview.py --results-dir data/results
 ```
 
 HTML만 생성:
@@ -276,26 +276,26 @@ uv run python scripts/generate-overview.py --format both
 ### 7.1 Scatter overview
 
 ```text
-images/plot_mae.png
-images/plot_mae.html
-images/plot_me.png
-images/plot_me.html
-images/plot_sd.png
-images/plot_sd.html
-images/plot_rmse.png
-images/plot_rmse.html
-images/plot_inference_time.png
-images/plot_inference_time.html
+results/plot_mae.png
+results/plot_mae.html
+results/plot_me.png
+results/plot_me.html
+results/plot_sd.png
+results/plot_sd.html
+results/plot_rmse.png
+results/plot_rmse.html
+results/plot_inference_time.png
+results/plot_inference_time.html
 ```
 
 ### 7.2 Ranking bar
 
 ```text
-images/bar_mae.png
-images/bar_me.png
-images/bar_sd.png
-images/bar_rmse.png
-images/bar_inference_time.png
+results/bar_mae.png
+results/bar_me.png
+results/bar_sd.png
+results/bar_rmse.png
+results/bar_inference_time.png
 ```
 
 ## 8. `--format` 동작

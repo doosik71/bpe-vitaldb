@@ -19,7 +19,7 @@ Cases (not segments) are shuffled and split into train / val / test to
 prevent data leakage across splits.
 
 Output layout:
-    <output-dir>/
+    <dataset-dir>/
         train/  <caseid>.npz
         val/    <caseid>.npz
         test/   <caseid>.npz
@@ -33,7 +33,7 @@ Usage:
 
 Options:
     --data-dir      Directory with .vital files   (default: data/vitaldb)
-    --output-dir    Root output directory         (default: data/dataset)
+    --dataset-dir   Root output directory         (default: data/dataset)
     --split         Train val test ratios         (default: 0.7 0.1 0.2)
     --target-hz     Output PPG sample rate (Hz)   (default: 125)
     --segment-sec   Window length in seconds      (default: 8)
@@ -90,7 +90,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--data-dir",    type=Path,  default=Path("data/vitaldb"),
                    help="Directory containing .vital files (default: data/vitaldb)")
-    p.add_argument("--output-dir",  type=Path,  default=Path("data/dataset"),
+    p.add_argument("--dataset-dir", type=Path,  default=Path("data/dataset"),
                    help="Root output directory (default: data/dataset)")
     p.add_argument("--split",       type=float, nargs=3,
                    metavar=("TRAIN", "VAL", "TEST"), default=[0.7, 0.1, 0.2],
@@ -361,13 +361,13 @@ def main() -> None:
 
     # -- create output directories ---------------------------------------------
     for split_name in splits:
-        (args.output_dir / split_name).mkdir(parents=True, exist_ok=True)
+        (args.dataset_dir / split_name).mkdir(parents=True, exist_ok=True)
 
     # -- warn about NPZ files not assigned to the current split ---------------
     for split_name, files in splits.items():
         expected = {p.stem for p in files}
         orphans  = [
-            npz.stem for npz in (args.output_dir / split_name).glob("*.npz")
+            npz.stem for npz in (args.dataset_dir / split_name).glob("*.npz")
             if npz.stem not in expected
         ]
         if orphans:
@@ -380,13 +380,13 @@ def main() -> None:
 
     # -- build flat task list (all splits combined) ----------------------------
     all_tasks: list[tuple[Path, Path, str]] = [
-        (path, args.output_dir / split_name, split_name)
+        (path, args.dataset_dir / split_name, split_name)
         for split_name, files in splits.items()
         for path in files
     ]
 
     csv_paths: dict[str, Path] = {
-        split_name: args.output_dir / split_name / INDEX_FILE
+        split_name: args.dataset_dir / split_name / INDEX_FILE
         for split_name in splits
     }
 
@@ -408,7 +408,7 @@ def main() -> None:
             if not csv_path.exists():
                 # First run for this split: build initial index from existing NPZs.
                 index: dict[str, int] = {}
-                existing_npzs = sorted((args.output_dir / split_name).glob("*.npz"))
+                existing_npzs = sorted((args.dataset_dir / split_name).glob("*.npz"))
                 if existing_npzs:
                     log.info(
                         "  %-5s : building index.csv from %d existing NPZ files ...",
@@ -516,7 +516,7 @@ def main() -> None:
         log.info("  %-5s   %12s   %12s   %5.1f%%", name, f"{new_segs:,}", f"{total_segs:,}", pct)
     log.info("  " + "-" * 42)
     log.info("  %-5s   %12s   %12s   %5.1f%%", "total", f"{total_new:,}", f"{total_all:,}", 100.0)
-    log.info("Output written to %s", args.output_dir.resolve())
+    log.info("Output written to %s", args.dataset_dir.resolve())
 
 
 if __name__ == "__main__":

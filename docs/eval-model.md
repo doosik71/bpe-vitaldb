@@ -414,4 +414,4 @@ Duo 모드는 전체 세그먼트와 수락 세그먼트 두 테이블을 각각
 | `bpe/models/duo.py`       | `_load_model(run_dir, device)` — Duo 모드용 체크포인트 로더           |
 | `bpe/train/dataset.py`    | `PPGDataset` — NPZ 로더, z-score 정규화, `_segs` / `_files` 속성 제공 |
 | `scripts/train-model.py`  | `best.pt`와 `config.json` 생성                                        |
-| `scripts/train-status.py` | 학습 곡선(`loss_graph.png`, `mae_graph.png`) 시각화                   |
+| `scripts/generate-train-status.py` | 학습 곡선(`loss_graph.png`, `mae_graph.png`) 시각화                   |
